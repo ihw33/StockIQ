@@ -1,0 +1,128 @@
+name: Deploy to Synology NAS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Prepare deployment files
+        run: |
+          mkdir -p deploy
+          cp -r .next deploy/
+          cp -r public deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          cp next.config.js deploy/
+          cp .env.example deploy/
+          echo "Build complete. Ready to deploy."
+
+      - name: Deploy to Synology NAS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: 172.30.1.34
+          username: thomas
+          password: ${{ secrets.SYNOLOGY_PASSWORD }}
+          port: 5000
+          script: |
+            # 배포 경로 설정
+            DEPLOY_PATH="/volume1/docker/stockiq/current"
+            BACKUP_PATH="/volume1/docker/stockiq/backup_$(date +%Y%m%d_%H%M%S)"
+
+            # 기존 백업
+            if [ -d "$DEPLOY_PATH" ]; then
+              echo "기존 버전 백업 중..."
+              cp -r "$DEPLOY_PATH" "$BACKUP_PATH"
+              echo "백업 완료: $BACKUP_PATH"
+            fi
+
+            mkdir -p "$DEPLOY_PATH"
+
+            echo "파일 배치 준비 완료"
+
+      - name: Deploy files to Synology
+        uses: burnett01/rsync-deployments@5.2.3
+        with:
+          switches: -avzr --delete
+          path: deploy/
+          remote_path: /volume1/docker/stockiq/current
+          remote_host: thomas@172.30.1.34
+          remote_password: ${{ secrets.SYNOLOGY_PASSWORD }}
+          remote_port: 5000
+
+      - name: Restart service
+        uses: appleboy/ssh-action@master
+        with:
+          host: 172.30.1.34
+          username: thomas
+          password: ${{ secrets.SYNOLOGY_PASSWORD }}
+          port: 5000
+          script: |
+            DEPLOY_PATH="/volume1/docker/stockiq/current"
+            LOGS_PATH="/volume1/docker/stockiq/logs"
+            
+            mkdir -p "$LOGS_PATH"
+            cd "$DEPLOY_PATH"
+            
+            # 기존 프로세스 중지
+            pkill -f "node.*3000" 2>/dev/null || true
+            
+            # Node.js 설치 확인
+            if command -v node &> /dev/null; then
+              echo "Node.js 설치됨: $(node --version)"
+            else
+              echo "Node.js 설치되지 않음"
+              exit 1
+            fi
+            
+            # 의존성 설치
+            echo "의존성 설치 중..."
+            npm ci --production
+            
+            # 빌드
+            echo "빌드 중..."
+            npm run build
+            
+            # 프로세스 시작
+            echo "프로세스 시작 중..."
+            nohup npm start > "$LOGS_PATH/app.log" 2>&1 &
+            
+            sleep 5
+            
+            echo "=== 배포 완료! 서버 상태 ==="
+            curl -s http://localhost:3000 | head -3
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "🚀 배포 완료!"
+          echo "Synology NAS: http://172.30.1.34:3000"
+          echo "GitHub: https://github.com/ihw33/StockIQ"
+          echo "배포 시간: $(date)"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "❌ 배포 실패!"
+          echo "GitHub Actions 로그 확인: https://github.com/ihw33/StockIQ/actions"
