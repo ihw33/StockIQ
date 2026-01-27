@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussion
+    url: https://github.com/ihw33/StockIQ/discussions
+    about: 일반적인 질문이나 토론
+  - name: 📚 Documentation
+    url: https://github.com/ihw33/StockIQ/wiki
+    about: 문서 및 가이드 확인

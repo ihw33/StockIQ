@@ -1,0 +1,402 @@
+Reading config from /Users/m4_macbook/Projects/Stockiq/scripts/../.env.local
+Getting Access Token...
+Token Received!
+
+--- Testing Weekly (ka10082) ---
+Request Body: {"stk_cd": "005930", "upd_stkpc_tp": "1", "base_dt": "20260118"}
+Response Keys: ['stk_cd', 'stk_stk_pole_chart_qry', 'return_code', 'return_msg']
+❌ Failed to find key 'stk_week_pole_chart_qry' or empty.
+{
+  "stk_cd": "005930",
+  "stk_stk_pole_chart_qry": [
+    {
+      "cur_prc": "148900",
+      "trde_qty": "121801572",
+      "trde_prica": "17265171818524",
+      "dt": "20260112",
+      "open_pric": "141000",
+      "high_pric": "149500",
+      "low_pric": "136800",
+      "pred_pre": "+9900",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+2.06"
+    },
+    {
+      "cur_prc": "139000",
+      "trde_qty": "205472025",
+      "trde_prica": "28447986061639",
+      "dt": "20260105",
+      "open_pric": "134600",
+      "high_pric": "144500",
+      "low_pric": "132700",
+      "pred_pre": "+10500",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+3.47"
+    },
+    {
+      "cur_prc": "128500",
+      "trde_qty": "69885632",
+      "trde_prica": "8524137063929",
+      "dt": "20251229",
+      "open_pric": "119400",
+      "high_pric": "128500",
+      "low_pric": "118200",
+      "pred_pre": "+11500",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+1.18"
+    },
+    {
+      "cur_prc": "117000",
+      "trde_qty": "91789471",
+      "trde_prica": "10337367172346",
+      "dt": "20251222",
+      "open_pric": "109700",
+      "high_pric": "117000",
+      "low_pric": "109300",
+      "pred_pre": "+10700",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+1.55"
+    },
+    {
+      "cur_prc": "106300",
+      "trde_qty": "108107073",
+      "trde_prica": "11439766649918",
+      "dt": "20251215",
+      "open_pric": "105300",
+      "high_pric": "109700",
+      "low_pric": "102700",
+      "pred_pre": "-2600",
+      "pred_pre_sig": "5",
+      "trde_tern_rt": "+1.83"
+    },
+    {
+      "cur_prc": "108900",
+      "trde_qty": "78769475",
+      "trde_prica": "8546685667942",
+      "dt": "20251208",
+      "open_pric": "109700",
+      "high_pric": "110500",
+      "low_pric": "106800",
+      "pred_pre": "+500",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+1.33"
+    },
+    {
+      "cur_prc": "108400",
+      "trde_qty": "70939656",
+      "trde_prica": "7398583831386",
+      "dt": "20251201",
+      "open_pric": "102000",
+      "high_pric": "108400",
+      "low_pric": "99900",
+      "pred_pre": "+7900",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+1.20"
+    },
+    {
+      "cur_prc": "100500",
+      "trde_qty": "99001482",
+      "trde_prica": "9932665001584",
+      "dt": "20251124",
+      "open_pric": "97800",
+      "high_pric": "105500",
+      "low_pric": "96200",
+      "pred_pre": "+5700",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+1.67"
+    },
+    {
+      "cur_prc": "94800",
+      "trde_qty": "103334007",
+      "trde_prica": "10128762033573",
+      "dt": "20251117",
+      "open_pric": "99800",
+      "high_pric": "102900",
+      "low_pric": "94500",
+      "pred_pre": "-2400",
+      "pred_pre_sig": "5",
+      "trde_tern_rt": "+1.75"
+    },
+    {
+      "cur_prc": "97200",
+      "trde_qty": "113643449",
+      "trde_prica": "11564294644330",
+      "dt": "20251110",
+      "open_pric": "98600",
+      "high_pric": "106000",
+      "low_pric": "97200",
+      "pred_pre": "-700
+
+--- Testing Monthly (ka10083) ---
+Request Body: {"stk_cd": "005930", "upd_stkpc_tp": "1", "base_dt": "20260118"}
+Response Keys: ['stk_cd', 'stk_mth_pole_chart_qry', 'return_code', 'return_msg']
+❌ Failed to find key 'stk_mont_pole_chart_qry' or empty.
+{
+  "stk_cd": "005930",
+  "stk_mth_pole_chart_qry": [
+    {
+      "cur_prc": "148900",
+      "trde_qty": "357736876",
+      "trde_prica": "49519098397657",
+      "dt": "20260102",
+      "open_pric": "120200",
+      "high_pric": "149500",
+      "low_pric": "120200",
+      "pred_pre": "+29000",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+6.04"
+    },
+    {
+      "cur_prc": "119900",
+      "trde_qty": "389028028",
+      "trde_prica": "42440599868027",
+      "dt": "20251201",
+      "open_pric": "102000",
+      "high_pric": "121200",
+      "low_pric": "99900",
+      "pred_pre": "+19400",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+6.57"
+    },
+    {
+      "cur_prc": "100500",
+      "trde_qty": "472946077",
+      "trde_prica": "47808514806341",
+      "dt": "20251103",
+      "open_pric": "106900",
+      "high_pric": "112400",
+      "low_pric": "94500",
+      "pred_pre": "-7000",
+      "pred_pre_sig": "5",
+      "trde_tern_rt": "+7.99"
+    },
+    {
+      "cur_prc": "107500",
+      "trde_qty": "484630984",
+      "trde_prica": "46949482115407",
+      "dt": "20251001",
+      "open_pric": "84900",
+      "high_pric": "108600",
+      "low_pric": "84700",
+      "pred_pre": "+23600",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+8.19"
+    },
+    {
+      "cur_prc": "83900",
+      "trde_qty": "409841865",
+      "trde_prica": "31949709943201",
+      "dt": "20250901",
+      "open_pric": "68400",
+      "high_pric": "86200",
+      "low_pric": "67500",
+      "pred_pre": "+14200",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+6.92"
+    },
+    {
+      "cur_prc": "69700",
+      "trde_qty": "282943885",
+      "trde_prica": "19986945141604",
+      "dt": "20250801",
+      "open_pric": "70200",
+      "high_pric": "72400",
+      "low_pric": "68300",
+      "pred_pre": "-1700",
+      "pred_pre_sig": "5",
+      "trde_tern_rt": "+4.78"
+    },
+    {
+      "cur_prc": "71400",
+      "trde_qty": "491591703",
+      "trde_prica": "32251479408862",
+      "dt": "20250701",
+      "open_pric": "60400",
+      "high_pric": "74000",
+      "low_pric": "59800",
+      "pred_pre": "+11600",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+8.30"
+    },
+    {
+      "cur_prc": "59800",
+      "trde_qty": "364257150",
+      "trde_prica": "21574084670678",
+      "dt": "20250602",
+      "open_pric": "56300",
+      "high_pric": "61600",
+      "low_pric": "56200",
+      "pred_pre": "+3600",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+6.15"
+    },
+    {
+      "cur_prc": "56200",
+      "trde_qty": "266168618",
+      "trde_prica": "14820880411617",
+      "dt": "20250502",
+      "open_pric": "55000",
+      "high_pric": "58600",
+      "low_pric": "53700",
+      "pred_pre": "+700",
+      "pred_pre_sig": "2",
+      "trde_tern_rt": "+4.50"
+    },
+    {
+      "cur_prc": "55500",
+      "trde_qty": "321308160",
+      "trde_prica": "17877960203358",
+      "dt": "20250401",
+      "open_pric": "58700",
+      "high_pric": "59600",
+      "low_pric": "52900",
+      "pred_pre": "-2300",
+    
+
+--- Testing Yearly (ka10084) ---
+Request Body: {"stk_cd": "005930", "upd_stkpc_tp": "1", "base_dt": "20260118"}
+Response Keys: ['return_msg', 'return_code']
+❌ Failed to find key 'stk_year_pole_chart_qry' or empty.
+{
+  "return_msg": "잘못된 요청입니다[1504:해당 URI에서는 지원하는 API ID가 아닙니다. API ID=ka10084, URI=/api/dostk/chart]",
+  "return_code": 1
+}
+
+--- Testing 3-Minute (ka10080) ---
+Request Body: {"stk_cd": "005930", "upd_stkpc_tp": "1", "tic_scope": "3"}
+Response Keys: ['stk_cd', 'stk_min_pole_chart_qry', 'return_code', 'return_msg']
+✅ Success! Got 900 items.
+First Item: {'cur_prc': '+148900', 'trde_qty': '2554482', 'cntr_tm': '20260116153000', 'open_pric': '+148900', 'high_pric': '+148900', 'low_pric': '+148900', 'acc_trde_qty': '29551193', 'pred_pre': '+5000', 'pred_pre_sig': '2'}
+
+--- Testing Tick (ka10079) ---
+Request Body: {"stk_cd": "005930", "upd_stkpc_tp": "1", "tic_scope": "1"}
+Response Keys: ['stk_cd', 'last_tic_cnt', 'stk_tic_chart_qry', 'return_code', 'return_msg']
+❌ Failed to find key 'stk_tick_pole_chart_qry' or empty.
+{
+  "stk_cd": "005930",
+  "last_tic_cnt": "",
+  "stk_tic_chart_qry": [
+    {
+      "cur_prc": "148900",
+      "trde_qty": "2554482",
+      "cntr_tm": "20260116153028",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "149000",
+      "trde_qty": "1",
+      "cntr_tm": "20260116151959",
+      "open_pric": "149000",
+      "high_pric": "149000",
+      "low_pric": "149000",
+      "pred_pre": "5100",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "149000",
+      "trde_qty": "1",
+      "cntr_tm": "20260116151959",
+      "open_pric": "149000",
+      "high_pric": "149000",
+      "low_pric": "149000",
+      "pred_pre": "5100",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "148900",
+      "trde_qty": "10",
+      "cntr_tm": "20260116151959",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "148900",
+      "trde_qty": "6",
+      "cntr_tm": "20260116151959",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "149000",
+      "trde_qty": "6",
+      "cntr_tm": "20260116151959",
+      "open_pric": "149000",
+      "high_pric": "149000",
+      "low_pric": "149000",
+      "pred_pre": "5100",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "148900",
+      "trde_qty": "32",
+      "cntr_tm": "20260116151959",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "148900",
+      "trde_qty": "8",
+      "cntr_tm": "20260116151959",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "148900",
+      "trde_qty": "41",
+      "cntr_tm": "20260116151959",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "149000",
+      "trde_qty": "1",
+      "cntr_tm": "20260116151959",
+      "open_pric": "149000",
+      "high_pric": "149000",
+      "low_pric": "149000",
+      "pred_pre": "5100",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "149000",
+      "trde_qty": "13",
+      "cntr_tm": "20260116151959",
+      "open_pric": "149000",
+      "high_pric": "149000",
+      "low_pric": "149000",
+      "pred_pre": "5100",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "148900",
+      "trde_qty": "15",
+      "cntr_tm": "20260116151959",
+      "open_pric": "148900",
+      "high_pric": "148900",
+      "low_pric": "148900",
+      "pred_pre": "5000",
+      "pred_pre_sig": "2"
+    },
+    {
+      "cur_prc": "149000",
+      "trde_qty": "40",
+      "cntr_tm": "20260116151

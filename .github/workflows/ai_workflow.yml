@@ -1,0 +1,108 @@
+name: AI Workflow
+
+on:
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created]
+
+jobs:
+  ai-task:
+    if: contains(github.event.issue.title, '[AI]')
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Parse Issue
+      id: parse
+      run: |
+        echo "issue_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+        echo "issue_title=${{ github.event.issue.title }}" >> $GITHUB_OUTPUT
+        
+    - name: Determine AI Tasks
+      run: |
+        # Graph RAG 관련
+        if [[ "${{ github.event.issue.title }}" == *"Graph RAG"* ]]; then
+          echo "TASK_TYPE=graph_rag" >> $GITHUB_ENV
+          echo "ASSIGNED_AI=gemini,codex,claude" >> $GITHUB_ENV
+        # Frontend 관련
+        elif [[ "${{ github.event.issue.title }}" == *"frontend"* ]] || [[ "${{ github.event.issue.title }}" == *"UI"* ]]; then
+          echo "TASK_TYPE=frontend" >> $GITHUB_ENV
+          echo "ASSIGNED_AI=cursor" >> $GITHUB_ENV
+        # Data 분석
+        elif [[ "${{ github.event.issue.title }}" == *"data"* ]] || [[ "${{ github.event.issue.title }}" == *"분석"* ]]; then
+          echo "TASK_TYPE=data" >> $GITHUB_ENV
+          echo "ASSIGNED_AI=chatgpt" >> $GITHUB_ENV
+        else
+          echo "TASK_TYPE=general" >> $GITHUB_ENV
+          echo "ASSIGNED_AI=gemini,codex,claude" >> $GITHUB_ENV
+        fi
+        
+    - name: Post Assignment Comment
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const issueNumber = ${{ steps.parse.outputs.issue_number }};
+          const taskType = process.env.TASK_TYPE;
+          const assignedAI = process.env.ASSIGNED_AI;
+          
+          const comment = `🤖 **AI Orchestra 작업 시작**
+          
+          작업 유형: ${taskType}
+          배정된 AI: ${assignedAI}
+          
+          각 AI가 순차적으로 작업을 수행합니다:
+          1. Gemini: 아키텍처 설계
+          2. Codex: 백엔드 구현
+          3. Claude: 통합 및 리뷰
+          
+          진행 상황은 이 이슈에 댓글로 업데이트됩니다.`;
+          
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issueNumber,
+            body: comment
+          });
+          
+    - name: Execute AI Tasks
+      run: |
+        # 실제 환경에서는 각 AI CLI를 호출
+        # 여기서는 시뮬레이션
+        echo "Executing AI tasks for issue #${{ steps.parse.outputs.issue_number }}"
+        echo "Task type: $TASK_TYPE"
+        echo "Assigned AI: $ASSIGNED_AI"
+        
+        # 결과 파일 생성 (시뮬레이션)
+        mkdir -p results
+        echo "# AI 작업 결과" > results/output.md
+        echo "Issue: #${{ steps.parse.outputs.issue_number }}" >> results/output.md
+        echo "작업 완료" >> results/output.md
+        
+    - name: Post Results
+      if: always()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const issueNumber = ${{ steps.parse.outputs.issue_number }};
+          
+          let result = '✅ **작업 완료**\n\n';
+          
+          if (fs.existsSync('results/output.md')) {
+            const output = fs.readFileSync('results/output.md', 'utf8');
+            result += output;
+          }
+          
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issueNumber,
+            body: result
+          });
