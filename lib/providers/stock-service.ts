@@ -29,7 +29,7 @@ export class StockService {
                 this.kiwoomRestProvider = new KiwoomRestProvider({
                     appKey: process.env.KIWOOM_APP_KEY!,
                     appSecret: process.env.KIWOOM_SECRET_KEY!,
-                    baseUrl: 'https://api.kiwoom.com'
+                    baseUrl: process.env.KIWOOM_BASE_URL || 'https://openapi.kiwoom.com'
                 });
             }
             return this.kiwoomRestProvider;

@@ -17,7 +17,7 @@ export class KiwoomRestProvider implements StockProvider {
         this.config = config;
         // Correct Domain from PDF: https://api.kiwoom.com (Real) / https://mockapi.kiwoom.com (Mock)
         // User didn't specify mock, assuming real given the keys.
-        this.config.baseUrl = 'https://api.kiwoom.com';
+        this.config.baseUrl = this.config.baseUrl || 'https://openapi.kiwoom.com';
     }
 
     private tokenRefreshPromise: Promise<string> | null = null; // Race Condition Lock

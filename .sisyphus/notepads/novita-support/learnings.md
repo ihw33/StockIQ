@@ -1,0 +1,4 @@
+- Added Novita AI (GLM-4) support to LLMClient using langchain_openai.ChatOpenAI.
+- Added langchain-openai>=0.1.0 to requirements.txt and cleaned up duplicates.
+- Novita AI uses base_url 'https://api.novita.ai/v3/openai' and model 'glm-4'.
+- Implemented model selection logic in a_analyze_text to handle 'glm', 'prometheus', 'claude', and 'atlas'.
