@@ -613,10 +613,13 @@ export function MacroDashboard() {
         fetch(`/api/macro?endpoint=date&date=${selectedDate}`)
             .then(r => r.json())
             .then(json => {
-                if (json.data) setDateData(json.data);
-                if (json.daily_review) setDateReview(json.daily_review);
+                setDateData(json.data || null);
+                setDateReview(json.daily_review || null);
             })
-            .catch(() => {})
+            .catch(() => {
+                setDateData(null);
+                setDateReview(null);
+            })
             .finally(() => setLoadingDate(false));
     }, [selectedDate]);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useReportStore, AnalysisReport } from '@/lib/store/report-store';
 import { CombinedReportView } from '@/components/features/reports/combined-report-view';
@@ -27,6 +27,14 @@ interface ReportGroup {
 }
 
 export default function ReportsPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">로딩 중...</div>}>
+            <ReportsContent />
+        </Suspense>
+    );
+}
+
+function ReportsContent() {
     const reports = useReportStore((state) => state.reports);
     const deleteReport = useReportStore((state) => state.deleteReport);
     const deleteSession = useReportStore((state) => state.deleteSession);
