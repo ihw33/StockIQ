@@ -709,14 +709,16 @@ export function MacroDashboard() {
                             </span>
                         )}
                     </div>
-                    <button
-                        onClick={handleCollect}
-                        disabled={collecting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition-colors"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${collecting ? 'animate-spin' : ''}`} />
-                        {collecting ? '수집 중...' : '수집'}
-                    </button>
+                    {!isViewingPast && (
+                        <button
+                            onClick={handleCollect}
+                            disabled={collecting}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition-colors"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${collecting ? 'animate-spin' : ''}`} />
+                            {collecting ? '수집 중...' : '수집'}
+                        </button>
+                    )}
                 </div>
             </div>
 
