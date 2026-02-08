@@ -1191,12 +1191,12 @@ async def get_portfolio_holdings():
             symbol = h.get("stk_cd", "").replace("A", "")
             if not symbol:
                 continue
-            avg_price = abs(float(h.get("avg_uv", 0)))
-            quantity = abs(int(h.get("blnc_qty", 0)))
-            current_price = abs(float(h.get("cur_uv", 0)))
+            avg_price = abs(float(h.get("avg_prc", 0)))
+            quantity = abs(int(h.get("rmnd_qty", 0)))
+            current_price = abs(float(h.get("cur_prc", 0)))
             eval_amount = abs(float(h.get("evlt_amt", 0)))
-            profit_amount = float(h.get("evlt_pfls_amt", 0))
-            profit_rate = float(h.get("evlt_pfls_rt", 0))
+            profit_amount = float(h.get("pl_amt", 0))
+            profit_rate = float(h.get("pl_rt", 0))
             holdings.append({
                 "symbol": symbol,
                 "symbolName": h.get("stk_nm", symbol).strip(),
