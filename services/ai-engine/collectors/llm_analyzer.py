@@ -59,6 +59,17 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
 
 종합 스코어: {macro_data.get('overall_score', 0):+.2f}"""
 
+    # 경제 캘린더
+    calendar_section = ""
+    cal = macro_data.get("economic_calendar", {})
+    cal_events = cal.get("economic_events", []) if cal else []
+    if cal_events:
+        calendar_section = "\n## 이번 주 주요 경제지표 발표 일정"
+        for ev in cal_events:
+            impact_mark = "🔴" if ev.get("impact") == "High" else "🟡"
+            fcst = f" (예상: {ev['forecast']}, 이전: {ev['previous']})" if ev.get("forecast") else ""
+            calendar_section += f"\n- {impact_mark} {ev.get('date', '')[:16]} {ev.get('title', '')}{fcst}"
+
     # 규칙 기반 연쇄분석 요약
     chain = macro_data.get("chain_analysis", "")
     chain_section = f"\n## 퀀트 엔진 연쇄분석\n{chain[:1500]}" if chain else ""
@@ -87,6 +98,7 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
             portfolio_section += f"\n## 관심종목\n{', '.join(w_names)}"
 
     prompt = f"""{data_section}
+{calendar_section}
 {chain_section}
 {news_section}
 {portfolio_section}

@@ -849,6 +849,7 @@ async def run_company_analysis(request: CompanyAnalysisRequest):
 from collectors.macro_dashboard import MacroDashboardCollector
 from collectors.news_collector import collect_all_news
 from collectors.llm_analyzer import generate_team_briefing
+from collectors.economic_calendar_collector import collect_calendar
 from datetime import date, timedelta
 import json
 
@@ -932,7 +933,17 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
         portfolio_symbols = all_holdings + watchlist
         logger.info(f"[Macro] Portfolio: 보유 {len(all_holdings)}개, 관심 {len(watchlist)}개")
 
-        # 5. 뉴스 수집 + LLM 팀 브리핑
+        # 5. 경제 캘린더 수집
+        calendar_data = {}
+        try:
+            calendar_data = collect_calendar()
+            logger.info(f"[Macro] Calendar: {len(calendar_data.get('economic_events', []))} events")
+        except Exception as cal_err:
+            logger.warning(f"[Macro] Calendar error (non-fatal): {cal_err}")
+
+        result["economic_calendar"] = calendar_data
+
+        # 6. 뉴스 수집 + LLM 팀 브리핑
         news_data = {}
         llm_analysis = None
         try:
@@ -975,13 +986,13 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                  gold_value, gold_change_pct,
                  bitcoin_value, bitcoin_change_pct,
                  krw_usd_value, krw_usd_change, krw_usd_change_pct, chain_analysis,
-                 llm_analysis, news_context)
+                 llm_analysis, news_context, economic_calendar)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                         $11, $12, $13, $14, $15, $16, $17,
                         $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb,
                         $25, $26, $27,
                         $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
-                        $38, $39, $40, $41, $42, $43)
+                        $38, $39, $40, $41, $42, $43, $44::jsonb)
                 ON CONFLICT (date) DO UPDATE SET
                     dxy_value = EXCLUDED.dxy_value, dxy_change_pct = EXCLUDED.dxy_change_pct, dxy_score = EXCLUDED.dxy_score,
                     us10y_value = EXCLUDED.us10y_value, us10y_change_bps = EXCLUDED.us10y_change_bps, us10y_score = EXCLUDED.us10y_score,
@@ -1003,6 +1014,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                     chain_analysis = EXCLUDED.chain_analysis,
                     llm_analysis = EXCLUDED.llm_analysis,
                     news_context = EXCLUDED.news_context,
+                    economic_calendar = EXCLUDED.economic_calendar,
                     updated_at = NOW()
             """,
             date.fromisoformat(result["date"]),
@@ -1028,6 +1040,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
             result.get("chain_analysis"),
             result.get("llm_analysis"),
             result.get("news_context"),
+            json.dumps(result.get("economic_calendar")) if result.get("economic_calendar") else None,
             )
 
         return {"status": "success", "data": result}
@@ -1281,6 +1294,7 @@ def _macro_row_to_dict(row) -> dict:
         "chain_analysis": d.get("chain_analysis", ""),
         "llm_analysis": d.get("llm_analysis", ""),
         "news_context": d.get("news_context", ""),
+        "economic_calendar": d.get("economic_calendar"),
     }
 
 
