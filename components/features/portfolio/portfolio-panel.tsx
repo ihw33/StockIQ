@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { usePortfolioStore } from '@/lib/stores/portfolio-store';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Pencil, Trash2, Wallet, Plus } from 'lucide-react';
+import { Pencil, Trash2, Wallet, Plus, RefreshCw } from 'lucide-react';
 import { PositionModal } from './trade-modal';
 import { cn } from '@/lib/utils';
 
@@ -15,14 +15,24 @@ interface PortfolioPanelProps {
 
 export function PortfolioPanel({ currentSymbol, onSelectSymbol }: PortfolioPanelProps) {
     const [mounted, setMounted] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+
+    const positions = usePortfolioStore((state) => state.positions);
+    const removePosition = usePortfolioStore((state) => state.removePosition);
+    const syncFromKiwoom = usePortfolioStore((state) => state.syncFromKiwoom);
+    const lastSyncedAt = usePortfolioStore((state) => state.lastSyncedAt);
+    const totalValue = usePortfolioStore((state) => state.getTotalValue());
+    const totalProfit = usePortfolioStore((state) => state.getTotalProfit());
 
     React.useEffect(() => {
         setMounted(true);
+        // 마운트 시 자동 싱크 (마지막 싱크가 1시간 이상 지났으면)
+        const last = usePortfolioStore.getState().lastSyncedAt;
+        const hourAgo = Date.now() - 60 * 60 * 1000;
+        if (!last || new Date(last).getTime() < hourAgo) {
+            syncFromKiwoom();
+        }
     }, []);
-    const positions = usePortfolioStore((state) => state.positions);
-    const removePosition = usePortfolioStore((state) => state.removePosition);
-    const totalValue = usePortfolioStore((state) => state.getTotalValue());
-    const totalProfit = usePortfolioStore((state) => state.getTotalProfit());
 
     const [positionModal, setPositionModal] = useState<{
         isOpen: boolean;
@@ -45,13 +55,34 @@ export function PortfolioPanel({ currentSymbol, onSelectSymbol }: PortfolioPanel
                             <Wallet className="w-5 h-5 text-purple-400" />
                             <h2 className="text-lg font-bold text-white">포트폴리오</h2>
                         </div>
-                        <button
-                            onClick={() => setPositionModal({ isOpen: true, mode: 'add' })}
-                            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors border border-blue-800/50"
-                        >
-                            <Plus className="w-3.5 h-3.5" /> 등록
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={async () => {
+                                    setSyncing(true);
+                                    await syncFromKiwoom();
+                                    setSyncing(false);
+                                }}
+                                disabled={syncing}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 rounded-lg transition-colors border border-emerald-800/50"
+                                title="키움 보유종목 동기화"
+                            >
+                                <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
+                                {syncing ? '동기화...' : '키움 싱크'}
+                            </button>
+                            <button
+                                onClick={() => setPositionModal({ isOpen: true, mode: 'add' })}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors border border-blue-800/50"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> 등록
+                            </button>
+                        </div>
                     </div>
+
+                    {lastSyncedAt && (
+                        <p className="text-[10px] text-slate-600 mb-2">
+                            키움 동기화: {new Date(lastSyncedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                    )}
 
                     {/* Total Summary */}
                     <div className="bg-slate-900/50 rounded-lg p-3 space-y-2">

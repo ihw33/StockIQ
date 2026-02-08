@@ -1177,6 +1177,43 @@ async def get_macro_by_date(target_date: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/portfolio/holdings")
+async def get_portfolio_holdings():
+    """키움 API에서 실제 보유종목 조회"""
+    account_no = os.getenv("KIWOOM_ACCOUNT")
+    if not account_no:
+        raise HTTPException(status_code=400, detail="KIWOOM_ACCOUNT not configured")
+    try:
+        kiwoom = KiwoomCollector()
+        raw = kiwoom.get_holdings(account_no)
+        holdings = []
+        for h in raw:
+            symbol = h.get("stk_cd", "").replace("A", "")
+            if not symbol:
+                continue
+            avg_price = abs(float(h.get("avg_uv", 0)))
+            quantity = abs(int(h.get("blnc_qty", 0)))
+            current_price = abs(float(h.get("cur_uv", 0)))
+            eval_amount = abs(float(h.get("evlt_amt", 0)))
+            profit_amount = float(h.get("evlt_pfls_amt", 0))
+            profit_rate = float(h.get("evlt_pfls_rt", 0))
+            holdings.append({
+                "symbol": symbol,
+                "symbolName": h.get("stk_nm", symbol).strip(),
+                "avgPrice": avg_price,
+                "quantity": quantity,
+                "currentPrice": current_price,
+                "totalValue": eval_amount,
+                "profitAmount": profit_amount,
+                "profitRate": profit_rate,
+            })
+        logger.info(f"[Portfolio] 키움 보유종목 {len(holdings)}개: {[h['symbolName'] for h in holdings]}")
+        return {"status": "success", "holdings": holdings}
+    except Exception as e:
+        logger.error(f"[Portfolio] 키움 보유종목 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/macro/dates")
 async def get_macro_available_dates():
     """데이터가 있는 날짜 목록"""

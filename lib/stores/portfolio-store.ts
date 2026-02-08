@@ -14,6 +14,7 @@ export interface Position {
 
 interface PortfolioState {
     positions: Position[];
+    lastSyncedAt: string | null;
 
     // Actions
     addPosition: (pos: { symbol: string; symbolName: string; avgPrice: number; quantity: number }) => void;
@@ -24,12 +25,14 @@ interface PortfolioState {
     getTotalValue: () => number;
     getTotalProfit: () => number;
     clearAllPositions: () => void;
+    syncFromKiwoom: () => Promise<boolean>;
 }
 
 export const usePortfolioStore = create<PortfolioState>()(
     persist(
         (set, get) => ({
             positions: [],
+            lastSyncedAt: null,
 
             addPosition: (pos) => {
                 set((state) => {
@@ -100,6 +103,28 @@ export const usePortfolioStore = create<PortfolioState>()(
 
             clearAllPositions: () => {
                 set({ positions: [] });
+            },
+
+            syncFromKiwoom: async () => {
+                try {
+                    const res = await fetch('/api/portfolio/holdings');
+                    if (!res.ok) return false;
+                    const data = await res.json();
+                    const holdings: Position[] = (data.holdings || []).map((h: any) => ({
+                        symbol: h.symbol,
+                        symbolName: h.symbolName,
+                        avgPrice: h.avgPrice,
+                        quantity: h.quantity,
+                        currentPrice: h.currentPrice,
+                        profitRate: h.profitRate,
+                        profitAmount: h.profitAmount,
+                        totalValue: h.totalValue,
+                    }));
+                    set({ positions: holdings, lastSyncedAt: new Date().toISOString() });
+                    return true;
+                } catch {
+                    return false;
+                }
             }
         }),
         {
