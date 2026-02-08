@@ -1,0 +1,1 @@
+- The 'Claude' and 'Atlas' options currently fallback to Gemini as no specific Claude client was initialized in the original code, but the logic structure is in place.

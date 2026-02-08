@@ -3,20 +3,20 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { symbol, mode, query } = body;
+        const { symbol, mode, query, position_info } = body;
 
         if (!symbol) {
             return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
         }
 
-        const pythonApiUrl = 'http://localhost:8001/api/strategy/chart-analysis';
+        const pythonApiUrl = 'http://127.0.0.1:8001/api/strategy/chart-analysis';
 
         const response = await fetch(pythonApiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ symbol, mode, query }),
+            body: JSON.stringify({ symbol, mode, query, position_info }),
         });
 
         if (!response.ok) {

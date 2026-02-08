@@ -17,29 +17,26 @@ export class StockService {
     }
 
     public getProvider(name: string = 'kiwoom'): StockProvider {
-        // Debug: Check Env Vars
+        // Try REST Provider first (if keys exist)
         const hasKeys = !!(process.env.KIWOOM_APP_KEY && process.env.KIWOOM_SECRET_KEY);
-        console.log(`[StockService] Requesting provider '${name}'. Keys present: ${hasKeys}`);
 
-        // 1. Try Kiwoom REST Provider if Env Vars enable it (Priority for Mac)
-        // User provided keys indicate they want to use this.
         if (hasKeys) {
             if (!this.kiwoomRestProvider) {
-                console.log("[StockService] Initializing Kiwoom REST Provider (Mac Native)...");
+                console.log('[StockService] Initializing Kiwoom REST Provider...');
                 this.kiwoomRestProvider = new KiwoomRestProvider({
                     appKey: process.env.KIWOOM_APP_KEY!,
                     appSecret: process.env.KIWOOM_SECRET_KEY!,
-                    baseUrl: 'https://api.kiwoom.com'
+                    baseUrl: process.env.KIWOOM_BASE_URL || 'https://openapi.kiwoom.com'
                 });
             }
             return this.kiwoomRestProvider;
         }
 
-        console.warn("[StockService] ⚠️ Kiwoom Keys missing! Falling back to Legacy Bridge (May not work).");
+        // Fallback to KiwoomProvider (Bridge/Mock)
+        console.log('[StockService] Using KiwoomProvider (with Mock fallback)...');
 
-        // 2. Default to Kiwoom Bridge (Windows)
         if (!this.kiwoomProvider) {
-            console.log("[StockService] Initializing KiwoomProvider (Bridge)...");
+            console.log('[StockService] Initializing KiwoomProvider...');
             this.kiwoomProvider = new KiwoomProvider({
                 isMock: false,
                 bridgeIp: '172.30.1.10'

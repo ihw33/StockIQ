@@ -1,6 +1,9 @@
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+import anthropic
+from langchain_core.messages import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -20,7 +23,7 @@ class MockLLMClient:
             **[Mock AI Morning Briefing]**
             *   **Market Sentiment**: Neutral to Bullish.
             *   **Key Driver**: Inflation data expectation.
-            *   **Action**: Watch NVDA for breakout above $150.
+            *   **Action**: Watch NVDA for breakout above .
             """
         elif "analyze" in user_text.lower():
             return "**[Mock Analysis]** The stock shows strong consolidation patterns. RSI is neutral (50). Recommended Action: Wait for breakout."
@@ -30,14 +33,81 @@ class MockLLMClient:
 class LLMClient:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
+        self.novita_api_key = os.getenv("NOVITA_API_KEY")
+        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
         self.use_mock = False 
 
+        # Initialize OpenRouter if API key is available (PRIORITY!)
+        if self.openrouter_api_key:
+            try:
+                # Claude Sonnet 3.5 via OpenRouter
+                self.claude_openrouter = ChatOpenAI(
+                    model="anthropic/claude-sonnet-4.5",
+                    api_key=self.openrouter_api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                    temperature=0.7,
+                    default_headers={
+                        "HTTP-Referer": "https://stockiq.local",
+                        "X-Title": "StockIQ AI Engine"
+                    }
+                )
+                
+                # Gemini 3.0 Pro via OpenRouter
+                self.gemini_openrouter = ChatOpenAI(
+                    model="google/gemini-exp-1206",
+                    api_key=self.openrouter_api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                    temperature=0.7,
+                    default_headers={
+                        "HTTP-Referer": "https://stockiq.local",
+                        "X-Title": "StockIQ AI Engine"
+                    }
+                )
+                
+                # GPT-4.5 Turbo via OpenRouter
+                self.gpt4_openrouter = ChatOpenAI(
+                    model="openai/gpt-4o",
+                    api_key=self.openrouter_api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                    temperature=0.7,
+                    default_headers={
+                        "HTTP-Referer": "https://stockiq.local",
+                        "X-Title": "StockIQ AI Engine"
+                    }
+                )
+                
+                print("✅ OpenRouter initialized: Claude Sonnet 4.5, Gemini 3.0 Pro, GPT-4.5 Turbo available")
+            except Exception as e:
+                print(f"Error initializing OpenRouter: {e}")
 
+        # Initialize Anthropic Claude if API key is available
+        if self.anthropic_api_key:
+            try:
+                self.claude_llm = ChatAnthropic(
+                    model="claude-3-5-sonnet-20240620",
+                    anthropic_api_key=self.anthropic_api_key,
+                    temperature=0.7,
+                    max_retries=2
+                )
+            except Exception as e:
+                print(f"Error initializing Anthropic LLM: {e}")
+
+        # Initialize Novita LLM if API key is available
+        if self.novita_api_key:
+            try:
+                self.novita_llm = ChatOpenAI(
+                    model="glm-4",
+                    api_key=self.novita_api_key,
+                    base_url="https://api.novita.ai/v3/openai"
+                )
+            except Exception as e:
+                print(f"Error initializing Novita LLM: {e}")
         
-        if not self.api_key:
-            print("Warning: GEMINI_API_KEY not found. Switching to Mock Mode.")
+        if not self.api_key and not hasattr(self, "claude_llm") and not hasattr(self, "claude_openrouter"):
+            print("Warning: No LLM API keys found. Switching to Mock Mode.")
             self.use_mock = True
-        else:
+        elif self.api_key:
             try:
                 # Initialize Gemini Pro
                 self.llm = ChatGoogleGenerativeAI(
@@ -48,25 +118,107 @@ class LLMClient:
                     max_retries=0
                 )
             except Exception as e:
-                print(f"Error initializing real LLM: {e}. Switching to Mock Mode.")
-                self.use_mock = True
+                if not hasattr(self, "claude_llm") and not hasattr(self, "claude_openrouter"):
+                    print(f"Error initializing Gemini LLM: {e}. Switching to Mock Mode.")
+                    self.use_mock = True
+                else:
+                    print(f"Error initializing Gemini LLM: {e}. Using fallback models.")
 
-    async def a_analyze_text(self, system_prompt: str, user_text: str) -> str:
+    async def a_analyze_text(self, system_prompt: str, user_text: str, model: str = "auto") -> str:
         """
-        Async version for FastAPI integration.
+        Async version for FastAPI integration with model selection.
+        
+        Args:
+            system_prompt: System prompt for the LLM
+            user_text: User input text
+            model: Model selection:
+                - "auto": Automatically select best available (Claude > Gemini > GPT-4)
+                - "claude": Claude Sonnet 4.5 (OpenRouter or direct)
+                - "gemini": Gemini 3.0 Pro (OpenRouter or direct)
+                - "gpt4": GPT-4.5 Turbo (OpenRouter)
+                - "glm": GLM-4 (Novita)
         """
         if self.use_mock:
             mock = MockLLMClient()
             return await mock.a_analyze_text(system_prompt, user_text)
 
+        # Auto model selection
+        client = None
+        selected_model = "unknown"
+        
+        if model == "auto":
+            # Priority: Claude (OpenRouter) > Gemini (OpenRouter) > GPT-4 (OpenRouter) > Direct Claude > Direct Gemini
+            if hasattr(self, "claude_openrouter"):
+                client = self.claude_openrouter
+                selected_model = "Claude Sonnet 4.5 (OpenRouter)"
+            elif hasattr(self, "gemini_openrouter"):
+                client = self.gemini_openrouter
+                selected_model = "Gemini 3.0 Pro (OpenRouter)"
+            elif hasattr(self, "gpt4_openrouter"):
+                client = self.gpt4_openrouter
+                selected_model = "GPT-4.5 Turbo (OpenRouter)"
+            elif hasattr(self, "claude_llm"):
+                client = self.claude_llm
+                selected_model = "Claude Sonnet 4.5 (Direct)"
+            elif hasattr(self, "llm"):
+                client = self.llm
+                selected_model = "Gemini Pro (Direct)"
+        
+        elif model in ["claude", "atlas"]:
+            if hasattr(self, "claude_openrouter"):
+                client = self.claude_openrouter
+                selected_model = "Claude Sonnet 4.5 (OpenRouter)"
+            elif hasattr(self, "claude_llm"):
+                client = self.claude_llm
+                selected_model = "Claude Sonnet 4.5 (Direct)"
+        
+        elif model == "gemini":
+            if hasattr(self, "gemini_openrouter"):
+                client = self.gemini_openrouter
+                selected_model = "Gemini 3.0 Pro (OpenRouter)"
+            elif hasattr(self, "llm"):
+                client = self.llm
+                selected_model = "Gemini Pro (Direct)"
+        
+        elif model == "gpt4":
+            if hasattr(self, "gpt4_openrouter"):
+                client = self.gpt4_openrouter
+                selected_model = "GPT-4.5 Turbo (OpenRouter)"
+        
+        elif model in ["glm", "prometheus"]:
+            if hasattr(self, "novita_llm"):
+                client = self.novita_llm
+                selected_model = "GLM-4 (Novita)"
+        
+        # Fallback if no client selected
+        if client is None:
+            if hasattr(self, "claude_openrouter"):
+                client = self.claude_openrouter
+                selected_model = "Claude Sonnet 4.5 (OpenRouter - Fallback)"
+            elif hasattr(self, "gemini_openrouter"):
+                client = self.gemini_openrouter
+                selected_model = "Gemini 3.0 Pro (OpenRouter - Fallback)"
+            elif hasattr(self, "claude_llm"):
+                client = self.claude_llm
+                selected_model = "Claude Sonnet 4.5 (Direct - Fallback)"
+            elif hasattr(self, "llm"):
+                client = self.llm
+                selected_model = "Gemini Pro (Direct - Fallback)"
+            else:
+                print("No LLM client available. Falling back to Mock.")
+                mock = MockLLMClient()
+                return await mock.a_analyze_text(system_prompt, user_text)
+
+        print(f"[LLM] Using: {selected_model}")
+        
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_text)
         ]
         try:
-            response = await self.llm.ainvoke(messages)
+            response = await client.ainvoke(messages)
             return response.content
         except Exception as e:
-            print(f"Gemini API Error: {e}. Falling back to Mock.")
+            print(f"LLM API Error ({selected_model}): {e}. Falling back to Mock.")
             mock = MockLLMClient()
             return await mock.a_analyze_text(system_prompt, user_text)

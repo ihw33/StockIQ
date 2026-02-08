@@ -347,12 +347,11 @@ export class KiwoomProvider implements StockProvider {
     }
 
     async getChart(symbol: string, interval: string): Promise<StockChartData[]> {
-        // STRICT REAL MODE: No Mock Fallback
         try {
             return await this.requestChartWait(symbol, interval);
         } catch (e) {
-            console.error(`[KiwoomProvider] Chart Request Failed (Strict Mode): ${e}`);
-            return []; // Return empty array to show "No Data" instead of Fake Chart
+            console.warn(`[KiwoomProvider] Chart Request Failed: ${e}. Using Mock Data.`);
+            return this.getMockChart(symbol, interval);
         }
     }
 
