@@ -1194,9 +1194,18 @@ async def get_portfolio_holdings():
             avg_price = abs(float(h.get("avg_prc", 0)))
             quantity = abs(int(h.get("rmnd_qty", 0)))
             current_price = abs(float(h.get("cur_prc", 0)))
-            eval_amount = abs(float(h.get("evlt_amt", 0)))
-            profit_amount = float(h.get("pl_amt", 0))
-            profit_rate = float(h.get("pl_rt", 0))
+
+            # NEXT(시간외) 가격 반영
+            try:
+                nxt = kiwoom.get_next_market_price(symbol)
+                if nxt and nxt.get("cur_price") and nxt["cur_price"] > 0:
+                    current_price = float(nxt["cur_price"])
+            except Exception:
+                pass
+
+            eval_amount = current_price * quantity
+            profit_amount = (current_price - avg_price) * quantity
+            profit_rate = ((current_price - avg_price) / avg_price * 100) if avg_price > 0 else 0.0
             holdings.append({
                 "symbol": symbol,
                 "symbolName": h.get("stk_nm", symbol).strip(),
@@ -1205,7 +1214,7 @@ async def get_portfolio_holdings():
                 "currentPrice": current_price,
                 "totalValue": eval_amount,
                 "profitAmount": profit_amount,
-                "profitRate": profit_rate,
+                "profitRate": round(profit_rate, 2),
             })
         logger.info(f"[Portfolio] 키움 보유종목 {len(holdings)}개: {[h['symbolName'] for h in holdings]}")
         return {"status": "success", "holdings": holdings}
