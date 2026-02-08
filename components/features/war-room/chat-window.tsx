@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Brain } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { chatService, ChatMessage } from "@/lib/services/chat-service";
+import { usePortfolioStore } from "@/lib/stores/portfolio-store";
+import { useReportStore } from "@/lib/store/report-store";
+import { AnalysisReportModal } from "./analysis-report-modal";
 
 
 export interface ChatCommand {
@@ -18,9 +21,13 @@ interface ChatWindowProps {
     isOpen?: boolean;
     currentSymbol?: string;
     currentName?: string;
+    pendingMessage?: string | null;
+    onPendingConsumed?: () => void;
 }
 
-export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentName }: ChatWindowProps) {
+export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentName, pendingMessage, onPendingConsumed }: ChatWindowProps) {
+    const positions = usePortfolioStore((state) => state.positions);
+    const addReport = useReportStore((state) => state.addReport);
 
 
     const [messages, setMessages] = useState<ChatMessage[]>([
@@ -32,6 +39,8 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
         }
     ]);
     const [isLoading, setIsLoading] = useState(false);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportData, setReportData] = useState<{ symbol: string; symbolName?: string; analysis: string; mode: 'algo' | 'llm' } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom
@@ -40,6 +49,49 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
             scrollRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [messages]);
+
+    // Handle pending message injection (from CompanyInfoCard AI button)
+    useEffect(() => {
+        if (!pendingMessage || isLoading) return;
+
+        const runAnalysis = async () => {
+            setIsLoading(true);
+            const userMsg: ChatMessage = {
+                id: Date.now().toString(),
+                role: 'user',
+                content: pendingMessage,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, userMsg]);
+            onPendingConsumed?.();
+
+            try {
+                const response = await chatService.analyzeCompany(currentSymbol!, pendingMessage);
+                setMessages(prev => [...prev, response]);
+
+                // Save to report store
+                addReport({
+                    symbol: currentSymbol!,
+                    symbolName: currentName || currentSymbol!,
+                    mode: 'llm',
+                    analysis: response.content,
+                    sessionId: `company_${currentSymbol}_${Date.now()}`,
+                });
+            } catch (error) {
+                console.error(error);
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: '기업분석 요청에 실패했습니다.',
+                    timestamp: new Date()
+                }]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        runAnalysis();
+    }, [pendingMessage]);
 
     const handleAnalyze = async () => {
         if (!currentSymbol) return;
@@ -54,8 +106,9 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
         setMessages(prev => [...prev, userMsg]);
 
         try {
-            // Force 'algo' mode for instant result
-            const response = await chatService.analyzeChart(currentSymbol, 'algo');
+            // Get position info for personalized analysis
+            const position = positions.find(p => p.symbol === currentSymbol);
+            const response = await chatService.analyzeChart(currentSymbol, 'algo', undefined, position);
             setMessages(prev => [...prev, response]);
         } catch (error) {
             console.error(error);
@@ -220,8 +273,12 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
         // Default: Call Chat Service (LLM) if symbol is selected
         if (currentSymbol) {
             try {
-                // Pass user content as query
-                const response = await chatService.analyzeChart(currentSymbol, 'llm', content);
+                // Extract position info for personalized analysis
+                const position = positions.find(p => p.symbol === currentSymbol);
+                console.log("LLM Chat Request - Symbol:", currentSymbol, "Query:", content, "Position:", position);
+
+                // Pass user content as query and position info
+                const response = await chatService.analyzeChart(currentSymbol, 'llm', content, position);
                 setMessages(prev => [...prev, response]);
             } catch (error) {
                 setMessages(prev => [...prev, {
@@ -259,108 +316,179 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
     };
 
 
+
+    const handleDeepAnalyze = async () => {
+        if (!currentSymbol) return;
+        setIsLoading(true);
+
+        try {
+            const position = positions.find(p => p.symbol === currentSymbol);
+            const posInfo = position ? {
+                avgPrice: position.avgPrice,
+                quantity: position.quantity,
+                profitRate: position.profitRate
+            } : undefined;
+
+            // 백엔드에 백그라운드 심층분석 요청 (즉시 응답, 서버에서 비동기 실행)
+            const res = await fetch('/api/ai/deep-analysis-start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: currentSymbol, position_info: posInfo }),
+            });
+
+            if (!res.ok) throw new Error('Failed to start deep analysis');
+
+            // 채팅에 시작 메시지 표시
+            const startMsg: ChatMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `🧠 **${currentName || currentSymbol}** 심층분석이 백그라운드에서 진행 중입니다.\n\n다른 페이지로 이동해도 분석은 계속됩니다. 완료되면 **보고서 탭**에 알림이 표시됩니다.`,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, startMsg]);
+
+        } catch (error) {
+            console.error(error);
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: '심층분석 시작에 실패했습니다. AI 엔진 연결을 확인하세요.',
+                timestamp: new Date()
+            }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div className="flex flex-col h-full bg-slate-950 border-r border-slate-800">
-            {/* Header */}
-            <div className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur">
-                <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-primary" />
-                    AI Commander
-                </h2>
-            </div>
+        <>
+            <div className="flex flex-col h-full bg-slate-950 border-r border-slate-800">
+                {/* Header */}
+                <div className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur">
+                    <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                        <Bot className="w-4 h-4 text-primary" />
+                        AI Commander
+                    </h2>
+                </div>
 
-            {/* Messages Area */}
-            <ScrollArea className="flex-1 p-4">
-                <div className="space-y-4">
-                    {messages.map((msg) => (
-                        <div
-                            key={msg.id}
-                            className={cn(
-                                "flex gap-3 max-w-[90%]",
-                                msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
-                            )}
-                        >
-                            <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                                msg.role === 'user' ? "bg-blue-600" : "bg-emerald-600"
-                            )}>
-                                {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                            </div>
-
-                            <div className={cn(
-                                "p-3 rounded-lg text-sm leading-relaxed whitespace-pre-wrap",
-                                msg.role === 'user'
-                                    ? "bg-blue-600/20 text-blue-100 rounded-tr-none"
-                                    : "bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700"
-                            )}>
-                                {/* Simple Markdown-like bold parsing for demo */}
-                                {msg.content.split('**').map((part, i) =>
-                                    i % 2 === 1 ? <strong key={i} className="text-white font-semibold">{part}</strong> : part
+                {/* Messages Area */}
+                <ScrollArea className="flex-1 p-4">
+                    <div className="space-y-4">
+                        {messages.map((msg) => (
+                            <div
+                                key={msg.id}
+                                className={cn(
+                                    "flex gap-3 max-w-[90%]",
+                                    msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
                                 )}
-                            </div>
-                        </div>
-                    ))}
+                            >
+                                <div className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                                    msg.role === 'user' ? "bg-blue-600" : "bg-emerald-600"
+                                )}>
+                                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                                </div>
 
-                    {isLoading && (
-                        <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0 animate-pulse">
-                                <Bot className="w-4 h-4" />
-                            </div>
-                            <div className="bg-slate-800 p-3 rounded-lg rounded-tl-none border border-slate-700">
-                                <div className="flex gap-1">
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                <div className={cn(
+                                    "p-3 rounded-lg text-sm leading-relaxed whitespace-pre-wrap",
+                                    msg.role === 'user'
+                                        ? "bg-blue-600/20 text-blue-100 rounded-tr-none"
+                                        : "bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700"
+                                )}>
+                                    {/* Simple Markdown-like bold parsing for demo */}
+                                    {msg.content.split('**').map((part, i) =>
+                                        i % 2 === 1 ? <strong key={i} className="text-white font-semibold">{part}</strong> : part
+                                    )}
                                 </div>
                             </div>
-                        </div>
-                    )}
-                    <div ref={scrollRef} />
-                </div>
-            </ScrollArea>
+                        ))}
 
-            {/* Input Area */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-                <div className="flex gap-2">
-                    {/* Quick Actions */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAnalyze}
-                        disabled={isLoading || !currentSymbol}
-                        className="bg-emerald-900/20 border-emerald-800 text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 transition-all font-mono text-xs"
-                    >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Analyze {currentSymbol}
-                    </Button>
-
-                    {/* Input Field */}
-                    <div className="flex-1">
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-
-                            onKeyDown={handleKeyDown}
-                            placeholder="Type a command (e.g., 'Show NVDA', '엔비디아 차트')..."
-                            className="w-full bg-slate-800 border-none text-slate-200 placeholder:text-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
+                        {isLoading && (
+                            <div className="flex gap-3">
+                                <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0 animate-pulse">
+                                    <Bot className="w-4 h-4" />
+                                </div>
+                                <div className="bg-slate-800 p-3 rounded-lg rounded-tl-none border border-slate-700">
+                                    <div className="flex gap-1">
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={scrollRef} />
                     </div>
+                </ScrollArea>
 
-                    <div className="relative">
+                {/* Input Area */}
+                <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+                    <div className="flex gap-2">
+                        {/* Quick Actions */}
                         <Button
-                            size="icon"
-                            variant="ghost"
-                            className="hover:bg-slate-800 text-slate-400 hover:text-emerald-400"
-                            onClick={handleSendMessage}
-                            disabled={isLoading || !inputValue.trim()}
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAnalyze}
+                            disabled={isLoading || !currentSymbol}
+                            className="bg-emerald-900/20 border-emerald-800 text-emerald-400 hover:bg-emerald-900/40 hover:text-emerald-300 transition-all font-mono text-xs"
                         >
-                            <Send className="w-4 h-4" />
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Analyze {currentSymbol}
                         </Button>
+
+                        {/* Deep Analysis Button */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDeepAnalyze}
+                            disabled={isLoading || !currentSymbol}
+                            className="bg-purple-900/20 border-purple-800 text-purple-400 hover:bg-purple-900/40 hover:text-purple-300 transition-all font-mono text-xs"
+                        >
+                            <Brain className="w-4 h-4 mr-2" />
+                            심층 분석
+                        </Button>
+
+                        {/* Input Field */}
+                        <div className="flex-1">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+
+                                onKeyDown={handleKeyDown}
+                                placeholder="Type a command (e.g., 'Show NVDA', '엔비디아 차트')..."
+                                className="w-full bg-slate-800 border-none text-slate-200 placeholder:text-slate-500 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                        </div>
+
+                        <div className="relative">
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="hover:bg-slate-800 text-slate-400 hover:text-emerald-400"
+                                onClick={handleSendMessage}
+                                disabled={isLoading || !inputValue.trim()}
+                            >
+                                <Send className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+
+            {/* Analysis Report Modal */}
+            {reportData && (
+                <AnalysisReportModal
+                    isOpen={showReportModal}
+                    onClose={() => setShowReportModal(false)}
+                    symbol={reportData.symbol}
+                    symbolName={reportData.symbolName}
+                    analysis={reportData.analysis}
+                    mode={reportData.mode}
+                />
+            )}
+
+        </>
     );
 }

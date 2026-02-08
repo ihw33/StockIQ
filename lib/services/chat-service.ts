@@ -4,7 +4,14 @@ export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: Date;
-    type?: 'briefing' | 'text';
+    type?: 'briefing' | 'text' | 'analysis';
+    analysisData?: {
+        symbol: string;
+        timeframe: string;
+        current_price?: number;
+        target_price?: number;
+        stop_loss?: number;
+    };
 }
 
 export interface MorningBriefingResponse {
@@ -70,12 +77,12 @@ class ChatService {
         }
     }
 
-    async analyzeChart(symbol: string, mode: 'algo' | 'llm' = 'llm', query?: string): Promise<ChatMessage> {
+    async analyzeChart(symbol: string, mode: 'algo' | 'llm' = 'llm', query?: string, position_info?: any): Promise<ChatMessage> {
         try {
             const response = await fetch('/api/ai/chart-analysis', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol, mode, query })
+                body: JSON.stringify({ symbol, mode, query, position_info })
             });
 
             if (!response.ok) throw new Error('Failed to analyze chart');
@@ -86,7 +93,14 @@ class ChatService {
                 role: 'assistant',
                 content: data.analysis,
                 timestamp: new Date(),
-                type: 'text' // Markdown analysis
+                type: 'analysis',
+                analysisData: {
+                    symbol,
+                    timeframe: 'D', // Default to daily
+                    current_price: data.current_price,
+                    target_price: data.target_price,
+                    stop_loss: data.stop_loss
+                }
             };
         } catch (error) {
             console.error("ChatService Error:", error);
@@ -94,6 +108,37 @@ class ChatService {
                 id: Date.now().toString(),
                 role: 'assistant',
                 content: "⚠️ **Analysis Failed**: Could not connect to AI Analyst.",
+                timestamp: new Date(),
+                type: 'text'
+            };
+        }
+    }
+
+    async analyzeCompany(symbol: string, dataPrompt: string): Promise<ChatMessage> {
+        try {
+            const response = await fetch('/api/ai/company-analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol, data_prompt: dataPrompt })
+            });
+
+            if (!response.ok) throw new Error('Failed to analyze company');
+            const data = await response.json();
+
+            return {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: data.analysis,
+                timestamp: new Date(),
+                type: 'analysis',
+                analysisData: { symbol, timeframe: 'fundamental' }
+            };
+        } catch (error) {
+            console.error("ChatService CompanyAnalysis Error:", error);
+            return {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: "기업분석 AI 응답을 받지 못했습니다.",
                 timestamp: new Date(),
                 type: 'text'
             };

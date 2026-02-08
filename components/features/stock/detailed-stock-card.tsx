@@ -1,15 +1,51 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { StockQuote, StockOrderBook as IStockOrderBook, StockChartData } from '@/lib/providers/stock-provider';
+import { useEffect, useState } from 'react';
+import { StockQuote, StockChartData } from '@/lib/providers/stock-provider';
 import { StockChart } from './stock-chart';
-import { StockOrderBook } from './stock-order-book';
-import { TradingPanel } from './trading-panel';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Settings, X } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
+import { PositionModal } from '@/components/features/portfolio/trade-modal';
+import { usePortfolioStore } from '@/lib/stores/portfolio-store';
+
+interface InvestorTrends {
+    foreign: number | null;
+    institution: number | null;
+    individual: number | null;
+}
 
 function formatNumber(num: number) {
     return new Intl.NumberFormat('ko-KR').format(num);
+}
+
+function formatCompact(num: number): string {
+    const abs = Math.abs(num);
+    const sign = num > 0 ? '+' : '';
+    if (abs >= 100000000) return `${sign}${(num / 100000000).toFixed(1)}억`;
+    if (abs >= 10000) return `${sign}${(num / 10000).toFixed(1)}만`;
+    return `${sign}${formatNumber(num)}`;
+}
+
+function InvestorRow({ label, data }: { label: string; data: InvestorTrends }) {
+    const items = [
+        { key: '외인', value: data.foreign },
+        { key: '기관', value: data.institution },
+        { key: '개인', value: data.individual },
+    ];
+    return (
+        <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-[10px] w-6">{label}</span>
+            {items.map(item => (
+                <span key={item.key} className="whitespace-nowrap">
+                    <span className="text-gray-500">{item.key}</span>
+                    <span className={`ml-0.5 font-semibold ${
+                        (item.value ?? 0) > 0 ? 'text-red-500' : (item.value ?? 0) < 0 ? 'text-blue-500' : 'text-gray-500'
+                    }`}>
+                        {item.value != null ? formatCompact(item.value) : '-'}
+                    </span>
+                </span>
+            ))}
+        </div>
+    );
 }
 
 function formatPercent(num: number) {
@@ -25,51 +61,40 @@ export function DetailedStockCard({
     name,
     onToggleMaximize,
     isMaximized,
-    isTradeOpen,
-    onToggleTrade,
 }: {
     symbol: string;
     name: string;
     onToggleMaximize?: () => void;
     isMaximized?: boolean;
-    isTradeOpen?: boolean;
-    onToggleTrade?: () => void;
 }) {
 
     const [quote, setQuote] = useState<StockQuote | null>(null);
-    const [orderBook, setOrderBook] = useState<IStockOrderBook | null>(null);
     const [chartData, setChartData] = useState<StockChartData[]>([]);
     const [loading, setLoading] = useState(true);
-    const [interval, setIntervalType] = useState('D'); // D, 1m, 5m, 15m
+    const [interval, setIntervalType] = useState('D');
     const [showBollinger, setShowBollinger] = useState(true);
-    const [showMACD, setShowMACD] = useState(true); // User requested default ON
-    const [showRSI, setShowRSI] = useState(true);   // User requested default ON
-    const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
+    const [showMACD, setShowMACD] = useState(true);
+    const [showRSI, setShowRSI] = useState(true);
+    const [positionModal, setPositionModal] = useState<{ isOpen: boolean; mode: 'add' | 'edit' } | null>(null);
+    const existingPosition = usePortfolioStore((s) => s.getPosition(symbol));
+    const [afterHours, setAfterHours] = useState<{ cur_price: number | null; change: number | null; change_rate: number | null; volume: number | null; source?: string } | null>(null);
+    const [investorTrends, setInvestorTrends] = useState<InvestorTrends | null>(null);
+    const [marketTrends, setMarketTrends] = useState<InvestorTrends | null>(null);
 
-    const orderBookRef = useRef<HTMLDivElement>(null);
-
-    const fetchData = async () => {
-        // ... (Using same logic as before, omitting full fetch implementation for brevity in rewrite if logic unchanged? No, I must include it)
-    };
-
-    // Copying fetch logic exactly
     useEffect(() => {
         let ignore = false;
         const load = async () => {
-            // Logic
             setLoading(true);
             try {
-                const [quoteRes, chartRes, orderBookRes] = await Promise.all([
+                const [quoteRes, chartRes] = await Promise.all([
                     fetch(`/api/stock/quote?symbol=${symbol}`),
                     fetch(`/api/stock/chart?symbol=${symbol}&interval=${interval}`),
-                    fetch(`/api/stock/orderbook?symbol=${symbol}`)
                 ]);
 
                 if (ignore) return;
 
                 if (quoteRes.ok) setQuote(await quoteRes.json());
                 if (chartRes.ok) setChartData(await chartRes.json());
-                if (orderBookRes.ok) setOrderBook(await orderBookRes.json());
             } catch (err) {
                 console.error(err);
             } finally {
@@ -81,13 +106,51 @@ export function DetailedStockCard({
         return () => { ignore = true; clearInterval(timer); };
     }, [symbol, interval]);
 
-    // Center OrderBook on load
+    // After-hours price (fetch once, no polling)
     useEffect(() => {
-        if (orderBook && orderBookRef.current) {
-            const container = orderBookRef.current;
-            container.scrollTop = (container.scrollHeight - container.clientHeight) / 2;
-        }
-    }, [orderBook?.timestamp]);
+        let ignore = false;
+        setAfterHours(null);
+        const loadAH = async () => {
+            try {
+                const res = await fetch(`/api/stock/after-hours?symbol=${symbol}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (!ignore && json.status === 'success' && json.data?.cur_price) {
+                        setAfterHours(json.data);
+                    }
+                }
+            } catch { /* silently fail */ }
+        };
+        loadAH();
+        return () => { ignore = true; };
+    }, [symbol]);
+
+    // Investor trends: per-stock + market (KODEX 200 as proxy), refresh every 30s
+    useEffect(() => {
+        let ignore = false;
+        setInvestorTrends(null);
+        setMarketTrends(null);
+        const loadTrends = async () => {
+            try {
+                const [stockRes, marketRes] = await Promise.all([
+                    fetch(`/api/stock/investor-trends?symbol=${symbol}`),
+                    fetch('/api/stock/investor-trends?symbol=069500'), // KODEX 200 = KOSPI proxy
+                ]);
+                if (ignore) return;
+                if (stockRes.ok) {
+                    const json = await stockRes.json();
+                    if (json.status === 'success' && json.data) setInvestorTrends(json.data);
+                }
+                if (marketRes.ok) {
+                    const json = await marketRes.json();
+                    if (json.status === 'success' && json.data) setMarketTrends(json.data);
+                }
+            } catch { /* silently fail */ }
+        };
+        loadTrends();
+        const timer = setInterval(loadTrends, 30000);
+        return () => { ignore = true; clearInterval(timer); };
+    }, [symbol]);
 
     if (loading && !quote) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
     if (!quote) return null;
@@ -113,14 +176,66 @@ export function DetailedStockCard({
                                     {isPositive ? '▲' : '▼'} {formatNumber(Math.abs(quote.change))} ({formatPercent(quote.changePercent)})
                                 </span>
                             </div>
+                            {afterHours && afterHours.cur_price && (afterHours.source?.startsWith('NEXT') || afterHours.cur_price !== quote.price || (afterHours.volume ?? 0) > 0) && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">
+                                        {afterHours.source?.startsWith('NEXT') ? '넥스트' : '시간외'}
+                                    </span>
+                                    <span className={`text-sm font-semibold ${(afterHours.change ?? 0) > 0 ? 'text-red-500' : (afterHours.change ?? 0) < 0 ? 'text-blue-500' : 'text-gray-600'}`}>
+                                        {formatNumber(Math.abs(afterHours.cur_price))}
+                                    </span>
+                                    {afterHours.change != null && afterHours.change !== 0 && (
+                                        <span className={`text-xs ${afterHours.change > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+                                            {afterHours.change > 0 ? '+' : ''}{formatNumber(afterHours.change)}
+                                            {afterHours.change_rate != null && ` (${afterHours.change_rate > 0 ? '+' : ''}${afterHours.change_rate.toFixed(2)}%)`}
+                                        </span>
+                                    )}
+                                    {afterHours.volume != null && afterHours.volume > 0 && (
+                                        <span className="text-[10px] text-gray-400">vol {formatNumber(afterHours.volume)}</span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0">
+                        {/* Investor Trends: Market (KODEX200) + Stock */}
+                        {(investorTrends || marketTrends) && (
+                            <div className="hidden sm:flex flex-col gap-0.5 text-xs border-r border-gray-200 pr-4">
+                                {marketTrends && (
+                                    <InvestorRow label="전체" data={marketTrends} />
+                                )}
+                                {investorTrends && (
+                                    <InvestorRow label="종목" data={investorTrends} />
+                                )}
+                            </div>
+                        )}
+
                         {/* Info */}
                         <div className="text-right text-xs text-gray-500 hidden sm:block whitespace-nowrap">
                             <div>거래량 {formatNumber(quote.volume)}</div>
                             <div>시가 {formatNumber(quote.open)}</div>
+                        </div>
+
+                        {/* Position Buttons */}
+                        <div className="flex gap-2">
+                            {existingPosition ? (
+                                <button
+                                    onClick={() => setPositionModal({ isOpen: true, mode: 'edit' })}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1"
+                                >
+                                    <Pencil size={14} />
+                                    수정
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setPositionModal({ isOpen: true, mode: 'add' })}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1"
+                                >
+                                    <Plus size={14} />
+                                    등록
+                                </button>
+                            )}
                         </div>
                         {onToggleMaximize && (
                             <button
@@ -140,134 +255,91 @@ export function DetailedStockCard({
                     </div>
                 </div>
 
-                <div className="flex flex-1 min-h-0 overflow-x-auto">
-                    {/* Left: Chart & Info */}
-                    <div className="flex-1 flex flex-col min-w-0">
-                        {/* Chart Header (Intervals + Indicators) */}
-                        <div className="p-2 flex gap-2 border-b text-xs items-center bg-white justify-between overflow-x-auto">
-                            <div className="flex gap-1">
-                                {[
-                                    { label: '일', value: 'D' },
-                                    { label: '주', value: 'W' },
-                                    { label: '월', value: 'M' },
-                                    { label: '분', value: '1m' },
-                                    { label: '초', value: '1s' }
-                                ].map(t => (
-                                    <button
-                                        key={t.value}
-                                        onClick={() => setIntervalType(t.value)}
-                                        className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${interval === t.value || (t.value === '1m' && interval.endsWith('m'))
-                                            ? 'bg-blue-600 text-white shadow-sm'
-                                            : 'bg-white text-gray-600 border hover:bg-gray-50'
-                                            }`}
+                <div className="flex-1 min-h-0 flex flex-col">
+                    {/* Chart Header (Intervals + Indicators) */}
+                    <div className="p-2 flex gap-2 border-b text-xs items-center bg-white justify-between overflow-x-auto">
+                        <div className="flex gap-1">
+                            {[
+                                { label: '일', value: 'D' },
+                                { label: '주', value: 'W' },
+                                { label: '월', value: 'M' },
+                                { label: '분', value: '1m' },
+                                { label: '초', value: '1s' }
+                            ].map(t => (
+                                <button
+                                    key={t.value}
+                                    onClick={() => setIntervalType(t.value)}
+                                    className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${interval === t.value || (t.value === '1m' && interval.endsWith('m'))
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'bg-white text-gray-600 border hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                            {(interval.endsWith('m')) && (
+                                <div className="flex items-center ml-1">
+                                    <select
+                                        value={interval}
+                                        onChange={(e) => setIntervalType(e.target.value)}
+                                        className="text-[11px] border border-gray-300 rounded bg-white text-gray-900 px-1 py-1 cursor-pointer focus:border-blue-500 outline-none"
                                     >
-                                        {t.label}
-                                    </button>
-                                ))}
-                                {(interval.endsWith('m')) && (
-                                    <div className="flex items-center ml-1">
-                                        <select
-                                            value={interval}
-                                            onChange={(e) => setIntervalType(e.target.value)}
-                                            className="text-[11px] border border-gray-300 rounded bg-white text-gray-900 px-1 py-1 cursor-pointer focus:border-blue-500 outline-none"
-                                        >
-                                            <option value="1m">1분</option>
-                                            <option value="3m">3분</option>
-                                            <option value="5m">5분</option>
-                                            <option value="10m">10분</option>
-                                            <option value="15m">15분</option>
-                                            <option value="30m">30분</option>
-                                            <option value="60m">60분</option>
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Indicators (Moved Here) */}
-                            <div className="flex bg-gray-100 rounded-lg p-0.5 space-x-0.5 ml-2">
-                                {[
-                                    { label: '볼린저', active: showBollinger, onClick: () => setShowBollinger(!showBollinger) },
-                                    { label: 'MACD', active: showMACD, onClick: () => setShowMACD(!showMACD) },
-                                    { label: 'RSI', active: showRSI, onClick: () => setShowRSI(!showRSI) },
-                                ].map(btn => (
-                                    <button
-                                        key={btn.label}
-                                        onClick={btn.onClick}
-                                        className={`px-2 py-0.5 text-[11px] rounded-md font-medium transition-all ${btn.active
-                                            ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
-                                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
-                                            }`}
-                                    >
-                                        {btn.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="flex-1 p-0 min-h-[150px] flex flex-col relative">
-                            <StockChart
-                                data={chartData}
-                                color={chartColor}
-                                height="100%"
-                                interval={interval}
-                                showBollinger={showBollinger}
-                                showMACD={showMACD}
-                                showRSI={showRSI}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Middle: Order Book */}
-                    <div className="w-[300px] min-w-[300px] flex flex-col border-l bg-white shrink-0">
-                        <div className="p-2 border-b bg-gray-50 font-bold text-xs text-center text-gray-700">호가 (Order Book)</div>
-                        <div
-                            ref={orderBookRef}
-                            className="flex-1 overflow-y-auto no-scrollbar relative"
-                        >
-                            {orderBook && <StockOrderBook bids={orderBook.bids} asks={orderBook.asks} onPriceClick={setSelectedPrice} />}
-                        </div>
-                        {/* Trading Strength Section */}
-                        <div className="p-3 border-t text-xs bg-gray-50 space-y-2">
-                            {orderBook && (
-                                <div className="flex flex-col gap-1">
-                                    <div className="flex justify-between text-[10px] text-gray-500">
-                                        <span>매수우위</span>
-                                        <span>매도우위</span>
-                                    </div>
-                                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden flex">
-                                        <div className="bg-blue-400 h-full" style={{ width: `${(100 * orderBook.asks.reduce((a, b) => a + b.volume, 0)) / (orderBook.asks.reduce((a, b) => a + b.volume, 0) + orderBook.bids.reduce((a, b) => a + b.volume, 0))}%` }} />
-                                        <div className="bg-red-400 h-full" style={{ width: `${(100 * orderBook.bids.reduce((a, b) => a + b.volume, 0)) / (orderBook.asks.reduce((a, b) => a + b.volume, 0) + orderBook.bids.reduce((a, b) => a + b.volume, 0))}%` }} />
-                                    </div>
+                                        <option value="1m">1분</option>
+                                        <option value="3m">3분</option>
+                                        <option value="5m">5분</option>
+                                        <option value="10m">10분</option>
+                                        <option value="15m">15분</option>
+                                        <option value="30m">30분</option>
+                                        <option value="60m">60분</option>
+                                    </select>
                                 </div>
                             )}
-                            <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                                <span className="text-gray-500">체결강도</span>
-                                <span className={`font-bold ${quote.change > 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                                    {(100 + (quote.changePercent * 5)).toFixed(2)}%
-                                </span>
-                            </div>
+                        </div>
+
+                        <div className="flex bg-gray-100 rounded-lg p-0.5 space-x-0.5 ml-2">
+                            {[
+                                { label: '볼린저', active: showBollinger, onClick: () => setShowBollinger(!showBollinger) },
+                                { label: 'MACD', active: showMACD, onClick: () => setShowMACD(!showMACD) },
+                                { label: 'RSI', active: showRSI, onClick: () => setShowRSI(!showRSI) },
+                            ].map(btn => (
+                                <button
+                                    key={btn.label}
+                                    onClick={btn.onClick}
+                                    className={`px-2 py-0.5 text-[11px] rounded-md font-medium transition-all ${btn.active
+                                        ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
+                                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
+                                        }`}
+                                >
+                                    {btn.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Right: Trading Panel (Conditional & Animated) */}
-                    {isTradeOpen && (
-                        <div className="w-[320px] flex flex-col bg-gray-50 shrink-0 border-l animate-in slide-in-from-right duration-200">
-                            <div className="p-3 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                                <span className="font-bold text-sm">⚡ 빠른주문 (Real Trading)</span>
-                                <button onClick={onToggleTrade} className="text-slate-400 hover:text-white"><X size={16} /></button>
-                            </div>
-                            <TradingPanel
-                                symbol={symbol}
-                                price={selectedPrice || quote.price}
-                                onSubmitOrder={(type, price, qty) => {
-                                    console.log(`Order: ${type} ${symbol} ${qty} @ ${price}`);
-                                    // alert(`주문 전송됨: ${type} ${symbol} ${qty}주 @ ${price.toLocaleString()}원`);
-                                }}
-                            />
-                        </div>
-                    )}
+                    <div className="flex-1 p-0 min-h-[150px] flex flex-col relative">
+                        <StockChart
+                            data={chartData}
+                            color={chartColor}
+                            height="100%"
+                            interval={interval}
+                            showBollinger={showBollinger}
+                            showMACD={showMACD}
+                            showRSI={showRSI}
+                        />
+                    </div>
                 </div>
             </div>
+
+            {/* Position Modal */}
+            {positionModal && (
+                <PositionModal
+                    isOpen={positionModal.isOpen}
+                    onClose={() => setPositionModal(null)}
+                    mode={positionModal.mode}
+                    symbol={symbol}
+                    symbolName={name}
+                />
+            )}
         </>
     );
 }

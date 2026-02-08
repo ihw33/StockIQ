@@ -136,10 +136,10 @@ export class KiwoomRestProvider implements StockProvider {
 
             return {
                 symbol,
-                price: parseVal(latest.cur_prc),
+                price: Math.abs(parseVal(latest.cur_prc)),
                 change: parseVal(latest.pred_pre),
                 changePercent: parseFloatVal(latest.pre_rt),
-                volume: parseVal(latest.acc_trde_qty),
+                volume: Math.abs(parseVal(latest.acc_trde_qty)),
                 // Note: ka10003 doesn't explicitly return Open/High/Low of the day in the list.
                 // Optimally we should call ka10001 or check if other fields exist, but for MVP quote, Price/Change is key.
                 // We will default Open/High/Low to Price or 0 for now.
@@ -206,22 +206,50 @@ export class KiwoomRestProvider implements StockProvider {
                 responseListKey = 'stk_min_pole_chart_qry';
             }
 
-            const response = await axios.post(`${this.config.baseUrl}/api/dostk/chart`, requestBody, {
-                headers: {
+            // For minute charts (especially 1m), need pagination to get full day data
+            // Kiwoom API returns ~100 items per call. 1m full day = ~390 items.
+            const needsPagination = apiId === 'ka10080' && (requestBody.tic_scope === '1' || requestBody.tic_scope === '3');
+            const maxPages = needsPagination ? 4 : 1;
+
+            let allItems: any[] = [];
+            let trCont = '';
+
+            for (let page = 0; page < maxPages; page++) {
+                const headers: any = {
                     'content-type': 'application/json;charset=UTF-8',
                     'api-id': apiId,
                     'Authorization': `Bearer ${this.accessToken}`
+                };
+                if (trCont) {
+                    headers['tr_cont'] = 'Y';
                 }
-            });
 
-            const data = response.data;
-            // Handle ambiguous response keys if needed, but we set specific ones now.
-            const items = data[responseListKey];
+                const response = await axios.post(`${this.config.baseUrl}/api/dostk/chart`, requestBody, { headers });
+                const data = response.data;
+                const items = data[responseListKey];
 
-            if (!items || !Array.isArray(items)) {
-                console.warn(`[KiwoomRest] Empty items for ${apiId} key=${responseListKey}`, data);
+                if (!items || !Array.isArray(items) || items.length === 0) {
+                    if (page === 0) {
+                        console.warn(`[KiwoomRest] Empty items for ${apiId} key=${responseListKey}`, Object.keys(data));
+                    }
+                    break;
+                }
+
+                allItems = allItems.concat(items);
+                console.log(`[KiwoomRest] ${apiId} page ${page + 1}: ${items.length} items (total: ${allItems.length})`);
+
+                // Check for continuation
+                const hasCont = data['tr_cont'] === 'Y' || data['tr_cont'] === 'y';
+                if (!hasCont || !needsPagination) break;
+
+                trCont = 'Y';
+            }
+
+            if (allItems.length === 0) {
                 return [];
             }
+
+            const items = allItems;
 
             // Parse Helper
             // Kiwoom returns signed strings (e.g. "-245000") to indicate drop. Chart needs ABSOLUTE values.

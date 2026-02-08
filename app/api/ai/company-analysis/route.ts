@@ -3,27 +3,25 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { symbol, mode, query, position_info } = body;
+        const { symbol, data_prompt } = body;
 
         if (!symbol) {
             return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
         }
 
-        const pythonApiUrl = 'http://127.0.0.1:8001/api/strategy/chart-analysis';
+        const pythonApiUrl = 'http://127.0.0.1:8001/api/strategy/company-analysis';
 
         const response = await fetch(pythonApiUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ symbol, mode, query, position_info }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol, data_prompt }),
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error("Python Analysis API Error:", errorText);
+            console.error("Python Company Analysis API Error:", errorText);
             return NextResponse.json(
-                { error: "Failed to fetch from Analysis Engine", details: errorText },
+                { error: "Failed to fetch from Company Analysis Engine", details: errorText },
                 { status: response.status }
             );
         }
@@ -32,7 +30,7 @@ export async function POST(request: Request) {
         return NextResponse.json(data);
 
     } catch (error) {
-        console.error("Analysis Proxy Error:", error);
+        console.error("Company Analysis Proxy Error:", error);
         return NextResponse.json(
             { error: "Internal Server Error", details: String(error) },
             { status: 500 }

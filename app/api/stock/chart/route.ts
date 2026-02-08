@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         }
 
         const chartData = await provider.getChart(symbol, interval);
+        console.log(`[API] /stock/chart result for ${symbol}:`, chartData?.length || 'NULL', "rows");
 
         return NextResponse.json(chartData);
     } catch (error) {
@@ -36,3 +37,4 @@ export async function GET(request: NextRequest) {
         );
     }
 }
+// Force Rebuild Fri Feb  6 16:08:14 KST 2026
