@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { PositionModal } from '@/components/features/portfolio/trade-modal';
 import {
     ChevronLeft, ChevronRight, Wallet, Star, Plus,
-    Pencil, Trash2, ArrowRightLeft
+    Pencil, Trash2, ArrowRightLeft, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,8 +43,20 @@ export function UnifiedSidebar({
 
     const positions = usePortfolioStore((s) => s.positions);
     const removePosition = usePortfolioStore((s) => s.removePosition);
+    const syncFromKiwoom = usePortfolioStore((s) => s.syncFromKiwoom);
+    const lastSyncedAt = usePortfolioStore((s) => s.lastSyncedAt);
     const totalValue = usePortfolioStore((s) => s.getTotalValue());
     const totalProfit = usePortfolioStore((s) => s.getTotalProfit());
+    const [syncing, setSyncing] = useState(false);
+
+    // 마운트 시 자동 싱크 (1시간 캐시)
+    React.useEffect(() => {
+        const last = usePortfolioStore.getState().lastSyncedAt;
+        const hourAgo = Date.now() - 60 * 60 * 1000;
+        if (!last || new Date(last).getTime() < hourAgo) {
+            syncFromKiwoom();
+        }
+    }, []);
     const totalProfitRate = totalValue > 0 ? (totalProfit / (totalValue - totalProfit)) * 100 : 0;
 
     const [positionModal, setPositionModal] = useState<{
@@ -152,6 +164,13 @@ export function UnifiedSidebar({
                             }
                         }}
                         nameMap={Object.fromEntries(watchlist.map(w => [w.symbol, w.name]))}
+                        syncing={syncing}
+                        lastSyncedAt={lastSyncedAt}
+                        onSync={async () => {
+                            setSyncing(true);
+                            await syncFromKiwoom();
+                            setSyncing(false);
+                        }}
                     />
                 ) : (
                     <WatchlistTab
@@ -184,7 +203,7 @@ export function UnifiedSidebar({
 
 // Portfolio Tab
 function PortfolioTab({
-    positions, totalValue, totalProfit, totalProfitRate, currentSymbol, onSelectSymbol, onAdd, onEdit, onDelete, nameMap,
+    positions, totalValue, totalProfit, totalProfitRate, currentSymbol, onSelectSymbol, onAdd, onEdit, onDelete, nameMap, syncing, lastSyncedAt, onSync,
 }: {
     positions: { symbol: string; symbolName: string; avgPrice: number; quantity: number; currentPrice: number; profitRate: number; profitAmount: number }[];
     totalValue: number; totalProfit: number; totalProfitRate: number;
@@ -194,6 +213,9 @@ function PortfolioTab({
     onEdit: (symbol: string, symbolName: string) => void;
     onDelete: (symbol: string) => void;
     nameMap: Record<string, string>;
+    syncing: boolean;
+    lastSyncedAt: string | null;
+    onSync: () => void;
 }) {
     const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
 
@@ -234,12 +256,27 @@ function PortfolioTab({
                         </span>
                     </div>
                 </div>
-                <button
-                    onClick={onAdd}
-                    className="w-full mt-2 flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors border border-blue-800/50"
-                >
-                    <Plus className="w-3.5 h-3.5" /> 종목 등록
-                </button>
+                <div className="flex gap-1.5 mt-2">
+                    <button
+                        onClick={onSync}
+                        disabled={syncing}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 rounded-lg transition-colors border border-emerald-800/50"
+                    >
+                        <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
+                        {syncing ? '동기화...' : '키움 싱크'}
+                    </button>
+                    <button
+                        onClick={onAdd}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors border border-blue-800/50"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> 등록
+                    </button>
+                </div>
+                {lastSyncedAt && (
+                    <p className="text-[10px] text-slate-600 mt-1 text-center">
+                        키움 동기화: {new Date(lastSyncedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                )}
             </div>
 
             {/* List */}
