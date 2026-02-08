@@ -761,42 +761,41 @@ export function MacroDashboard() {
                 </div>
             )}
 
-            {displayData && !loadingDate && (
-            <>
-            {/* Market Status Notice */}
-            {(() => {
-                const krDay = displayData.kr_market_day || '';
-                const isWeekend = krDay === '토' || krDay === '일';
-                const usDate = displayData.us_market_date || '';
+            {displayData && !loadingDate && (() => {
                 const krDate = displayData.date || '';
+                const dateObj = krDate ? new Date(krDate + 'T00:00:00') : new Date();
+                const dayOfWeek = dateObj.getDay(); // 0=Sun, 6=Sat
+                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                const krDay = displayData.kr_market_day || dayNames[dayOfWeek] || '';
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const usDate = displayData.us_market_date || '';
                 const isUsStale = usDate && krDate && usDate < krDate;
+
                 if (isWeekend) {
                     return (
-                        <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-4 text-center">
-                            <span className="text-slate-400 text-sm">
-                                📅 오늘은 <span className="text-white font-bold">{krDay}요일</span>로 한국·미국 시장이 모두 휴장입니다.
-                                {isUsStale && (
-                                    <span className="block mt-1 text-xs text-slate-500">
-                                        아래 글로벌 데이터는 지난 금요일({usDate}) 미국 종가 기준입니다.
-                                    </span>
-                                )}
-                            </span>
+                        <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-8 text-center">
+                            <div className="text-3xl mb-3">📅</div>
+                            <p className="text-slate-300 font-medium mb-2">
+                                {krDate} ({krDay}요일) — 한국·미국 시장 휴장
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                다음 보고서는 월요일 오전 7시에 자동 생성됩니다
+                            </p>
                         </div>
                     );
                 }
-                if (isUsStale) {
-                    const dayDiff = Math.round((new Date(krDate).getTime() - new Date(usDate).getTime()) / 86400000);
-                    return (
-                        <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3">
-                            <span className="text-amber-400 text-xs">
-                                ⚠️ 글로벌 데이터는 {usDate}({displayData.us_market_day}) 기준입니다{dayDiff > 1 ? ` (${dayDiff}일 전)` : ''}.
-                                한국 장중 수급 데이터는 실시간으로 반영됩니다.
-                            </span>
-                        </div>
-                    );
-                }
-                return null;
-            })()}
+
+                return (
+            <>
+            {/* Market Status Notice */}
+            {isUsStale && (
+                <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3">
+                    <span className="text-amber-400 text-xs">
+                        ⚠️ 글로벌 데이터는 {usDate}({displayData.us_market_day}) 기준입니다{(() => { const d = Math.round((new Date(krDate).getTime() - new Date(usDate).getTime()) / 86400000); return d > 1 ? ` (${d}일 전)` : ''; })()}.
+                        한국 장중 수급 데이터는 실시간으로 반영됩니다.
+                    </span>
+                </div>
+            )}
 
             {/* Daily Review */}
             {displayReview && <DailyReviewCard review={displayReview} />}
@@ -1059,7 +1058,8 @@ export function MacroDashboard() {
                 )}
             </div>
             </>
-            )}
+                );
+            })()}
 
             {/* LLM Briefing History */}
             {briefingHistory.length > 0 && (
