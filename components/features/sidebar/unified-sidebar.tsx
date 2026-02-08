@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { usePortfolioStore } from '@/lib/stores/portfolio-store';
 import { WatchlistItem, WATCHLIST_GROUPS } from '@/lib/hooks/use-watchlist';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { PositionModal } from '@/components/features/portfolio/trade-modal';
 import {
     ChevronLeft, ChevronRight, Wallet, Star, Plus,
@@ -298,7 +297,7 @@ function PortfolioTab({
                             <div
                                 key={pos.symbol}
                                 className={cn(
-                                    'rounded-lg p-2.5 cursor-pointer transition-all border',
+                                    'relative group rounded-lg p-2.5 cursor-pointer transition-all border',
                                     currentSymbol === pos.symbol
                                         ? 'border-purple-600 bg-slate-800/80'
                                         : 'border-transparent hover:bg-slate-800/40'
@@ -317,25 +316,23 @@ function PortfolioTab({
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex justify-between text-[10px] text-slate-500 mb-2">
+                                <div className="flex justify-between text-[10px] text-slate-500">
                                     <span>평단 {pos.avgPrice.toLocaleString()}</span>
                                     <span>{pos.quantity}주</span>
                                 </div>
-                                <div className="flex gap-1.5">
-                                    <Button
-                                        size="sm"
+                                <div className="absolute right-1.5 top-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
                                         onClick={(e) => { e.stopPropagation(); onEdit(pos.symbol, getName(pos)); }}
-                                        className="flex-1 h-6 text-[10px] bg-amber-900/30 hover:bg-amber-900/50 text-amber-400 border border-amber-800"
+                                        className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-slate-700 transition-colors"
                                     >
-                                        <Pencil className="w-3 h-3 mr-0.5" /> 수정
-                                    </Button>
-                                    <Button
-                                        size="sm"
+                                        <Pencil className="w-3 h-3" />
+                                    </button>
+                                    <button
                                         onClick={(e) => { e.stopPropagation(); onDelete(pos.symbol); }}
-                                        className="flex-1 h-6 text-[10px] bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800"
+                                        className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-700 transition-colors"
                                     >
-                                        <Trash2 className="w-3 h-3 mr-0.5" /> 삭제
-                                    </Button>
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
                                 </div>
                             </div>
                         ))}
