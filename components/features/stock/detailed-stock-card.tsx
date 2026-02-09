@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { StockQuote, StockChartData } from '@/lib/providers/stock-provider';
 import { StockChart } from './stock-chart';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, RefreshCw } from 'lucide-react';
 import { PositionModal } from '@/components/features/portfolio/trade-modal';
 import { usePortfolioStore } from '@/lib/stores/portfolio-store';
 
@@ -25,7 +25,14 @@ function formatCompact(num: number): string {
     return `${sign}${formatNumber(num)}`;
 }
 
-function InvestorRow({ label, data }: { label: string; data: InvestorTrends }) {
+function formatEok(num: number): string {
+    const sign = num > 0 ? '+' : '';
+    const abs = Math.abs(num);
+    if (abs >= 10000) return `${sign}${(num / 10000).toFixed(1)}조`;
+    return `${sign}${formatNumber(num)}억`;
+}
+
+function InvestorRow({ label, data, unit }: { label: string; data: InvestorTrends; unit?: 'eok' }) {
     const items = [
         { key: '외인', value: data.foreign },
         { key: '기관', value: data.institution },
@@ -40,7 +47,7 @@ function InvestorRow({ label, data }: { label: string; data: InvestorTrends }) {
                     <span className={`ml-0.5 font-semibold ${
                         (item.value ?? 0) > 0 ? 'text-red-500' : (item.value ?? 0) < 0 ? 'text-blue-500' : 'text-gray-500'
                     }`}>
-                        {item.value != null ? formatCompact(item.value) : '-'}
+                        {item.value != null ? (unit === 'eok' ? formatEok(item.value) : formatCompact(item.value)) : '-'}
                     </span>
                 </span>
             ))}
@@ -80,6 +87,7 @@ export function DetailedStockCard({
     const [afterHours, setAfterHours] = useState<{ cur_price: number | null; change: number | null; change_rate: number | null; volume: number | null; source?: string } | null>(null);
     const [investorTrends, setInvestorTrends] = useState<InvestorTrends | null>(null);
     const [marketTrends, setMarketTrends] = useState<InvestorTrends | null>(null);
+    const [trendsLoading, setTrendsLoading] = useState(false);
 
     useEffect(() => {
         let ignore = false;
@@ -125,31 +133,29 @@ export function DetailedStockCard({
         return () => { ignore = true; };
     }, [symbol]);
 
-    // Investor trends: per-stock + market (KODEX 200 as proxy), refresh every 30s
+    // Investor trends: per-stock + market (삼성전자 proxy)
+    const loadTrends = async () => {
+        setTrendsLoading(true);
+        try {
+            const [stockRes, marketRes] = await Promise.all([
+                fetch(`/api/stock/investor-trends?symbol=${symbol}`),
+                fetch('/api/market/investor-trends'),
+            ]);
+            if (stockRes.ok) {
+                const json = await stockRes.json();
+                if (json.status === 'success' && json.data) setInvestorTrends(json.data);
+            }
+            if (marketRes.ok) {
+                const json = await marketRes.json();
+                if (json.status === 'success' && json.data) setMarketTrends(json.data);
+            }
+        } catch { /* silently fail */ }
+        setTrendsLoading(false);
+    };
     useEffect(() => {
-        let ignore = false;
         setInvestorTrends(null);
         setMarketTrends(null);
-        const loadTrends = async () => {
-            try {
-                const [stockRes, marketRes] = await Promise.all([
-                    fetch(`/api/stock/investor-trends?symbol=${symbol}`),
-                    fetch('/api/stock/investor-trends?symbol=069500'), // KODEX 200 = KOSPI proxy
-                ]);
-                if (ignore) return;
-                if (stockRes.ok) {
-                    const json = await stockRes.json();
-                    if (json.status === 'success' && json.data) setInvestorTrends(json.data);
-                }
-                if (marketRes.ok) {
-                    const json = await marketRes.json();
-                    if (json.status === 'success' && json.data) setMarketTrends(json.data);
-                }
-            } catch { /* silently fail */ }
-        };
         loadTrends();
-        const timer = setInterval(loadTrends, 30000);
-        return () => { ignore = true; clearInterval(timer); };
     }, [symbol]);
 
     if (loading && !quote) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
@@ -199,15 +205,21 @@ export function DetailedStockCard({
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0">
-                        {/* Investor Trends: Market (KODEX200) + Stock */}
+                        {/* Investor Trends + Refresh */}
                         {(investorTrends || marketTrends) && (
-                            <div className="hidden sm:flex flex-col gap-0.5 text-xs border-r border-gray-200 pr-4">
-                                {marketTrends && (
-                                    <InvestorRow label="전체" data={marketTrends} />
-                                )}
-                                {investorTrends && (
-                                    <InvestorRow label="종목" data={investorTrends} />
-                                )}
+                            <div className="hidden sm:flex items-center gap-2 border-r border-gray-200 pr-4">
+                                <div className="flex flex-col gap-0.5 text-xs">
+                                    {marketTrends && <InvestorRow label="시장" data={marketTrends} unit="eok" />}
+                                    {investorTrends && <InvestorRow label="종목" data={investorTrends} />}
+                                </div>
+                                <button
+                                    onClick={() => loadTrends()}
+                                    disabled={trendsLoading}
+                                    className="p-1 hover:bg-gray-200 rounded transition-colors text-gray-400 hover:text-gray-600"
+                                    title="수급 새로고침"
+                                >
+                                    <RefreshCw size={12} className={trendsLoading ? 'animate-spin' : ''} />
+                                </button>
                             </div>
                         )}
 

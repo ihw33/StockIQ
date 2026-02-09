@@ -38,12 +38,20 @@ interface KrwUsdItem {
     change_pct: number;
 }
 
+interface RiskIndicators {
+    us2y?: { value?: number | null; change_bps?: number };
+    spread_2s10s?: number | null;
+    hy_spread?: { value?: number | null; change_bps?: number };
+    move?: { value?: number | null; change_pct?: number };
+    us30y?: { value?: number | null; change_bps?: number };
+}
+
 interface MacroData {
     date: string;
     kr_market_day?: string;
     us_market_date?: string;
     us_market_day?: string;
-    global_markets?: GlobalMarkets;
+    global_markets?: GlobalMarkets & { ewy?: GlobalMarketItem };
     tier_a: {
         dxy: MacroScore;
         us10y: MacroScore;
@@ -54,12 +62,15 @@ interface MacroData {
         futures: MacroScore;
         short_selling: MacroScore;
     };
+    risk_indicators?: RiskIndicators;
     overall_score: number;
     safety_level: 1 | 2 | 3;
     prediction_direction: string;
     interpretation: string;
     chain_analysis?: string;
     llm_analysis?: string;
+    llm_analysis_pm?: string;
+    collected_at_pm?: string;
     news_context?: string;
     economic_calendar?: {
         economic_events: EconomicEvent[];
@@ -374,6 +385,25 @@ function MarketCard({ label, icon, value, changePct, unit }: {
     );
 }
 
+// ─── Risk Indicator Card (no scoring) ────────────────────
+function RiskCard({ label, value, subValue, subColor, desc }: {
+    label: string;
+    value: string;
+    subValue: string;
+    subColor?: 'red' | 'green' | 'neutral';
+    desc?: string;
+}) {
+    const color = subColor === 'red' ? 'text-red-400' : subColor === 'green' ? 'text-emerald-400' : 'text-slate-400';
+    return (
+        <div className="rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
+            <div className="text-[10px] text-slate-500 mb-0.5">{label}</div>
+            {desc && <div className="text-[9px] text-slate-600 mb-1">{desc}</div>}
+            <div className="text-sm font-bold text-white">{value}</div>
+            <div className={`text-xs mt-0.5 ${color}`}>{subValue}</div>
+        </div>
+    );
+}
+
 // ─── Score Card ──────────────────────────────────────────
 function ScoreCard({ label, icon, value, subValue, unit, score, accuracy, zoneKey, rawValue }: {
     label: string;
@@ -569,7 +599,8 @@ function DateStrip({
     selectedDate: string | null;
     onSelectDate: (date: string | null) => void;
 }) {
-    const today = new Date().toISOString().slice(0, 10);
+    const toLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const today = toLocal(new Date());
     const dateMap = new Map(availableDates.map(d => [d.date, d]));
 
     // 최근 14일 생성 (오늘 포함)
@@ -577,7 +608,7 @@ function DateStrip({
     for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        days.push(d.toISOString().slice(0, 10));
+        days.push(toLocal(d));
     }
 
     return (
@@ -652,6 +683,8 @@ export function MacroDashboard() {
     const [loading, setLoading] = useState(true);
     const [collecting, setCollecting] = useState(false);
     const [llmOpen, setLlmOpen] = useState(false);
+    const [llmPmOpen, setLlmPmOpen] = useState(false);
+    const [yesterdayTierB, setYesterdayTierB] = useState<any>(null);
     const [selectedBriefingDate, setSelectedBriefingDate] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<string | null>(null); // null = today
     const [dateData, setDateData] = useState<MacroData | null>(null);
@@ -667,6 +700,7 @@ export function MacroDashboard() {
             if (json.data) setData(json.data);
             if (json.daily_review) setReview(json.daily_review);
             if (json.accuracy) setAccuracy(json.accuracy);
+            if (json.yesterday_tier_b) setYesterdayTierB(json.yesterday_tier_b);
         } catch (e) {
             console.error('Macro fetch error:', e);
         }
@@ -720,7 +754,11 @@ export function MacroDashboard() {
     const handleCollect = async () => {
         setCollecting(true);
         try {
-            const res = await fetch('/api/macro', { method: 'POST' });
+            const res = await fetch('/api/macro', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'manual' }),
+            });
             const json = await res.json();
             if (json.data) setData(json.data);
             await fetchHistory();
@@ -1001,6 +1039,107 @@ export function MacroDashboard() {
                 </div>
             </div>
 
+            {/* Risk / Liquidity Indicators (Tier A+) */}
+            {displayData.risk_indicators && (
+                <div>
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                        리스크 / 유동성 지표
+                        <span className="ml-2 text-[10px] font-normal normal-case text-slate-600">(LLM 참고용)</span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {/* US 2Y + 2s10s Spread */}
+                        <RiskCard
+                            label="US 2Y + 2s10s"
+                            desc="단기금리 + 장단기 스프레드 (역전 시 침체 신호)"
+                            value={displayData.risk_indicators.us2y?.value != null ? `${displayData.risk_indicators.us2y.value.toFixed(2)}%` : '-'}
+                            subValue={(() => {
+                                const bps = displayData.risk_indicators.us2y?.change_bps || 0;
+                                const spread = displayData.risk_indicators.spread_2s10s;
+                                const spreadStr = spread != null ? ` | 2s10s ${spread > 0 ? '+' : ''}${spread.toFixed(0)}bp` : '';
+                                return `${bps >= 0 ? '+' : ''}${bps.toFixed(1)}bp${spreadStr}`;
+                            })()}
+                            subColor={(() => {
+                                const spread = displayData.risk_indicators.spread_2s10s;
+                                if (spread != null && spread < 0) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                        {/* HY Spread */}
+                        <RiskCard
+                            label="HY Spread (하이일드)"
+                            desc="회사채 위험 프리미엄 (400bp↑ 위험회피, 600bp↑ 신용경색)"
+                            value={displayData.risk_indicators.hy_spread?.value != null ? `${displayData.risk_indicators.hy_spread.value.toFixed(0)}bp` : '-'}
+                            subValue={`${(displayData.risk_indicators.hy_spread?.change_bps || 0) >= 0 ? '+' : ''}${(displayData.risk_indicators.hy_spread?.change_bps || 0).toFixed(1)}bp`}
+                            subColor={(() => {
+                                const v = displayData.risk_indicators.hy_spread?.value;
+                                if (v != null && v >= 400) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                        {/* MOVE Index */}
+                        <RiskCard
+                            label="MOVE (채권 변동성)"
+                            desc="채권판 VIX (120↑ 금리 급변 경계)"
+                            value={displayData.risk_indicators.move?.value != null ? displayData.risk_indicators.move.value.toFixed(1) : '-'}
+                            subValue={`${(displayData.risk_indicators.move?.change_pct || 0) >= 0 ? '+' : ''}${(displayData.risk_indicators.move?.change_pct || 0).toFixed(2)}%`}
+                            subColor={(() => {
+                                const v = displayData.risk_indicators.move?.value;
+                                if (v != null && v >= 120) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                        {/* EWY */}
+                        <RiskCard
+                            label="EWY (MSCI Korea ETF)"
+                            desc="외국인이 보는 한국시장 대리지표"
+                            value={displayData.global_markets?.ewy?.value != null ? `$${displayData.global_markets.ewy.value.toFixed(2)}` : '-'}
+                            subValue={`${(displayData.global_markets?.ewy?.change_pct || 0) >= 0 ? '+' : ''}${(displayData.global_markets?.ewy?.change_pct || 0).toFixed(2)}%`}
+                            subColor={(() => {
+                                const chg = displayData.global_markets?.ewy?.change_pct || 0;
+                                if (chg > 0.5) return 'green';
+                                if (chg < -0.5) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* 전일 마감 잔고 (Yesterday Tier B) */}
+            {yesterdayTierB && !isViewingPast && (
+                <div>
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                        전일 마감 잔고
+                        <span className="ml-2 text-[10px] font-normal normal-case text-slate-600">
+                            ({yesterdayTierB.date})
+                        </span>
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-900/20 p-3">
+                            <div className="text-[10px] text-slate-500 mb-1">외국인 현물</div>
+                            <div className={`text-sm font-bold ${(yesterdayTierB.foreign_cash?.net_amount || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(yesterdayTierB.foreign_cash?.net_amount || 0) >= 0 ? '+' : ''}{(yesterdayTierB.foreign_cash?.net_amount || 0).toLocaleString()}억
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">스코어: {yesterdayTierB.foreign_cash?.score ?? '-'}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-900/20 p-3">
+                            <div className="text-[10px] text-slate-500 mb-1">외국인 선물</div>
+                            <div className={`text-sm font-bold ${(yesterdayTierB.futures?.net || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(yesterdayTierB.futures?.net || 0) >= 0 ? '+' : ''}{(yesterdayTierB.futures?.net || 0).toLocaleString()}계약
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">스코어: {yesterdayTierB.futures?.score ?? '-'}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-900/20 p-3">
+                            <div className="text-[10px] text-slate-500 mb-1">공매도 변동</div>
+                            <div className={`text-sm font-bold ${(yesterdayTierB.short_selling?.change_pct || 0) <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(yesterdayTierB.short_selling?.change_pct || 0) >= 0 ? '+' : ''}{(yesterdayTierB.short_selling?.change_pct || 0).toFixed(1)}%
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">스코어: {yesterdayTierB.short_selling?.score ?? '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Tier B: Flow */}
             <div>
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
@@ -1107,22 +1246,23 @@ export function MacroDashboard() {
                 </div>
             )}
 
-            {/* LLM Team Briefing */}
+            {/* AM 예측 브리핑 */}
             <div className="rounded-lg border border-purple-900/50 bg-purple-950/20 p-5">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-purple-300 flex items-center gap-2">
                         <Sparkles className="w-4 h-4" />
-                        LLM 팀 브리핑
+                        AM 예측 브리핑
+                        <span className="text-[10px] font-normal text-purple-400/60">07:00</span>
                     </h3>
                     <div className="flex items-center gap-2">
-                        {!displayData.llm_analysis && (
+                        {!displayData.llm_analysis && !collecting && (
                             <button
                                 onClick={handleCollect}
                                 disabled={collecting}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white rounded-lg transition-colors"
                             >
                                 <Sparkles className={`w-3 h-3 ${collecting ? 'animate-spin' : ''}`} />
-                                {collecting ? '생성 중...' : '브리핑 생성'}
+                                브리핑 생성
                             </button>
                         )}
                         {displayData.llm_analysis && (
@@ -1138,7 +1278,7 @@ export function MacroDashboard() {
                 </div>
                 {!displayData.llm_analysis && !collecting && (
                     <p className="mt-3 text-xs text-slate-500">
-                        오늘의 LLM 팀 브리핑이 아직 없습니다. 매크로 데이터 + 뉴스를 기반으로 전문가 팀 분석을 생성합니다.
+                        AM 예측 브리핑이 아직 없습니다. 매일 07:00 자동 생성됩니다.
                     </p>
                 )}
                 {collecting && !displayData.llm_analysis && (
@@ -1158,6 +1298,38 @@ export function MacroDashboard() {
                     </p>
                 )}
             </div>
+
+            {/* PM 결산 브리핑 */}
+            {displayData.llm_analysis_pm && (
+                <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-5">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            PM 결산 브리핑
+                            <span className="text-[10px] font-normal text-amber-400/60">
+                                {displayData.collected_at_pm ? new Date(displayData.collected_at_pm).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '18:00'}
+                            </span>
+                        </h3>
+                        <button
+                            onClick={() => setLlmPmOpen(!llmPmOpen)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-amber-300 hover:bg-amber-900/30 rounded-lg transition-colors"
+                        >
+                            {llmPmOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            {llmPmOpen ? '접기' : '펼치기'}
+                        </button>
+                    </div>
+                    {llmPmOpen && (
+                        <div className="mt-4 pt-4 border-t border-amber-900/30">
+                            <LlmBriefingContent content={displayData.llm_analysis_pm} />
+                        </div>
+                    )}
+                    {!llmPmOpen && (
+                        <p className="mt-2 text-xs text-slate-500 truncate">
+                            {displayData.llm_analysis_pm.split('\n').find(l => l.trim() && !l.startsWith('#'))?.trim().slice(0, 120) || '결산 브리핑이 준비되었습니다.'}...
+                        </p>
+                    )}
+                </div>
+            )}
             </>
                 );
             })()}

@@ -1,11 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, Brain, Building2, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import type { RecentAlert } from './right-panel';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Plain div used instead of Radix ScrollArea to avoid display:table width issues
+
+interface InvestorHistoryItem {
+    date: string;
+    close: number;
+    change: number;
+    volume: number;
+    foreign: number;
+    institution: number;
+    individual: number;
+}
+
+interface InvestorCumulative {
+    foreign: number;
+    institution: number;
+    individual: number;
+}
 
 // ─── Company data types & evaluation (from company-info-card) ───
 
@@ -224,6 +240,8 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
     const [loadingCompany, setLoadingCompany] = useState(false);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [companyLoading, setCompanyLoading] = useState(false);
+    const [investorHistory, setInvestorHistory] = useState<InvestorHistoryItem[]>([]);
+    const [investorCumulative, setInvestorCumulative] = useState<InvestorCumulative | null>(null);
 
     // Fetch company info when symbol changes
     useEffect(() => {
@@ -240,6 +258,28 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                 }
             } catch { /* silent */ }
             finally { if (!ignore) setCompanyLoading(false); }
+        };
+        load();
+        return () => { ignore = true; };
+    }, [currentSymbol]);
+
+    // Fetch investor history when symbol changes
+    useEffect(() => {
+        if (!currentSymbol) return;
+        setInvestorHistory([]);
+        setInvestorCumulative(null);
+        let ignore = false;
+        const load = async () => {
+            try {
+                const res = await fetch(`/api/stock/investor-history?symbol=${currentSymbol}&days=60`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (!ignore) {
+                        setInvestorHistory(json.data || []);
+                        setInvestorCumulative(json.cumulative || null);
+                    }
+                }
+            } catch { /* silent */ }
         };
         load();
         return () => { ignore = true; };
@@ -387,7 +427,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
             )}
 
             {/* Company Info (dark theme) */}
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
                 <div className="p-3">
                     {companyLoading && !companyData ? (
                         <div className="animate-pulse space-y-3">
@@ -492,6 +532,70 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                     {generateSummary(companyData)}
                                 </p>
                             </div>
+
+                            {/* Investor Daily Table (0796 style) */}
+                            {investorHistory.length > 0 && (() => {
+                                const fmtQty = (v: number) => {
+                                    const abs = Math.abs(v);
+                                    const s = v > 0 ? '+' : v < 0 ? '-' : '';
+                                    if (abs >= 1_000_000) return `${s}${(abs / 1_000_000).toFixed(1)}M`;
+                                    if (abs >= 1_000) return `${s}${Math.round(abs / 1_000)}K`;
+                                    return `${s}${abs}`;
+                                };
+                                const clr = (v: number) => v > 0 ? 'text-red-400' : v < 0 ? 'text-blue-400' : 'text-slate-600';
+                                return (
+                                <div className="bg-slate-800/50 rounded-lg p-2 mt-3">
+                                    <span className="font-bold text-xs text-slate-300">투자자별 매매동향 <span className="text-slate-500 font-normal">(주)</span></span>
+
+                                    {/* Cumulative */}
+                                    {investorCumulative && (
+                                        <div className="flex items-center gap-1.5 mt-1.5 mb-2 text-[11px] bg-slate-900/50 rounded px-2 py-1">
+                                            <span className="text-slate-500">누적</span>
+                                            <span className={clr(investorCumulative.individual)}>
+                                                개인 {fmtQty(investorCumulative.individual)}
+                                            </span>
+                                            <span className={clr(investorCumulative.foreign)}>
+                                                외인 {fmtQty(investorCumulative.foreign)}
+                                            </span>
+                                            <span className={clr(investorCumulative.institution)}>
+                                                기관 {fmtQty(investorCumulative.institution)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Scrollable list — grid layout */}
+                                    <div className="max-h-[280px] overflow-y-auto overflow-x-hidden text-[11px]">
+                                        {/* Header */}
+                                        <div className="grid text-slate-500 border-b border-slate-700 pb-0.5 mb-0.5 sticky top-0 bg-slate-800/95 z-10" style={{gridTemplateColumns:'36px 54px 46px 38px 1fr 1fr 1fr'}}>
+                                            <span>일자</span>
+                                            <span className="text-right">종가</span>
+                                            <span className="text-right">대비</span>
+                                            <span className="text-right">거래량</span>
+                                            <span className="text-right">개인</span>
+                                            <span className="text-right">외국인</span>
+                                            <span className="text-right">기관</span>
+                                        </div>
+                                        {/* Rows */}
+                                        {investorHistory.map(row => {
+                                            const sign = (v: number) => v > 0 ? `+${v}` : `${v}`;
+                                            const dt = row.date ? `${row.date.slice(4, 6)}/${row.date.slice(6, 8)}` : '';
+                                            const vol = row.volume >= 1_000_000 ? `${(row.volume / 1_000_000).toFixed(1)}M` : row.volume >= 1000 ? `${Math.round(row.volume / 1000)}K` : `${row.volume}`;
+                                            return (
+                                                <div key={row.date} className="grid border-b border-slate-800/20 hover:bg-slate-700/30 py-0.5" style={{gridTemplateColumns:'36px 54px 46px 38px 1fr 1fr 1fr'}}>
+                                                    <span className="text-slate-400">{dt}</span>
+                                                    <span className="text-right text-slate-300 font-mono">{row.close?.toLocaleString() || '-'}</span>
+                                                    <span className={`text-right font-mono ${clr(row.change)}`}>{row.change ? sign(row.change) : '-'}</span>
+                                                    <span className="text-right text-slate-500 font-mono">{vol}</span>
+                                                    <span className={`text-right font-mono ${clr(row.individual)}`}>{fmtQty(row.individual)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.foreign)}`}>{fmtQty(row.foreign)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.institution)}`}>{fmtQty(row.institution)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                );
+                            })()}
                         </div>
                     ) : (
                         <div className="text-center text-slate-600 text-xs py-8">
@@ -499,7 +603,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                         </div>
                     )}
                 </div>
-            </ScrollArea>
+            </div>
         </div>
     );
 }

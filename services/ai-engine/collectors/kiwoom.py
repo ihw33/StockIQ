@@ -47,9 +47,9 @@ class KiwoomCollector:
                 logger.error(f"Failed to get Kiwoom Token: {e}")
             return None
 
-    def get_price_history(self, symbol: str, interval: str = "D", count: int = 60):
+    def get_price_history(self, symbol: str, interval: str = "D", count: int = 60, adjusted: bool = True):
         token = self._get_token()
-        if not token: 
+        if not token:
             logger.error("Checking Token Failed")
             return pd.DataFrame()
 
@@ -58,7 +58,7 @@ class KiwoomCollector:
         api_id = "ka10081"
         req_body = {
             "stk_cd": symbol,
-            "upd_stkpc_tp": "1"
+            "upd_stkpc_tp": "1" if adjusted else "0"
         }
         today = datetime.now().strftime("%Y%m%d")
 
@@ -90,9 +90,10 @@ class KiwoomCollector:
             # --- Dynamic List Finding ---
             items = []
             possible_keys = [
-                "stk_day_pole_chart_qry", 
-                "stk_week_pole_chart_qry", 
-                "stk_mth_pole_chart_qry", 
+                "stk_day_pole_chart_qry",
+                "stk_week_pole_chart_qry",
+                "stk_stk_pole_chart_qry",
+                "stk_mth_pole_chart_qry",
                 "stk_min_pole_chart_qry",
                 "stk_tic_pole_chart_qry"
             ]
@@ -420,14 +421,23 @@ class KiwoomCollector:
                 row = result
 
             # Parse investor data
-            foreign = safe_int(row.get('frgnr_invsr'))   # 외국인
-            institution = safe_int(row.get('orgn'))       # 기관합계
-            individual = safe_int(row.get('ind_invsr'))   # 개인
-            finance = safe_int(row.get('fnnc_invt'))      # 금융투자
-            insurance = safe_int(row.get('insrnc'))        # 보험
-            pension = safe_int(row.get('penfnd_etc'))      # 연기금
-            private_fund = safe_int(row.get('samo_fund'))  # 사모펀드
-            etc_corp = safe_int(row.get('etc_corp'))        # 기타법인
+            foreign = safe_int(row.get('frgnr_invsr')) or 0   # 외국인
+            finance = safe_int(row.get('fnnc_invt')) or 0      # 금융투자
+            insurance = safe_int(row.get('insrnc')) or 0        # 보험
+            invest_trust = safe_int(row.get('invtrt')) or 0     # 투신
+            etc_finance = safe_int(row.get('etc_fnnc')) or 0    # 기타금융
+            bank = safe_int(row.get('bank')) or 0               # 은행
+            pension = safe_int(row.get('penfnd_etc')) or 0      # 연기금
+            private_fund = safe_int(row.get('samo_fund')) or 0  # 사모펀드
+            etc_corp = safe_int(row.get('etc_corp')) or 0       # 기타법인
+            nation = safe_int(row.get('natn')) or 0             # 국가/지자체
+
+            # 기관합계 = 소분류 합산 (orgn 필드가 장중 0으로 오는 경우 대비)
+            institution = finance + insurance + invest_trust + etc_finance + bank + pension + private_fund
+
+            # 개인 = 잔여분 (ind_invsr 필드가 장중 0으로 오는 경우 대비)
+            ind_raw = safe_int(row.get('ind_invsr')) or 0
+            individual = ind_raw if ind_raw != 0 else -(foreign + institution + etc_corp + nation)
 
             return {
                 'date': row.get('dt'),
@@ -446,9 +456,89 @@ class KiwoomCollector:
             traceback.print_exc()
             return None
 
-    def get_investor_trends_history(self, symbol: str, days: int = 5):
+    def get_market_investor_trends(self):
         """
-        ka10059: 최근 N일 투자자별 매매동향 반환
+        ka10066: KOSPI 전체 시장 투자자별 매매동향 (외국인/기관/개인)
+        """
+        token = self._get_token()
+        if not token: return None
+
+        today = datetime.now().strftime("%Y%m%d")
+        url = f"{self.base_url}/api/dostk/mrkcond"
+        headers = {
+            "content-type": "application/json;charset=UTF-8",
+            "api-id": "ka10066",
+            "Authorization": f"Bearer {token}"
+        }
+        body = {
+            "stk_cd": "001",       # KOSPI 전체
+            "strtt_dt": today,
+            "end_dt": today,
+            "amt_qty_tp": "1",     # 수량
+            "trde_tp": "0",        # 순매수
+            "stex_tp": "1"         # 거래소
+        }
+        try:
+            print(f"[MarketInvestorTrends] Calling ka10066 with body: {body}")
+            res = requests.post(url, headers=headers, json=body, timeout=10)
+            res.raise_for_status()
+            data = res.json()
+            print(f"[MarketInvestorTrends] Response keys: {list(data.keys())}")
+
+            items = data.get("opaf_invsr_trde", [])
+            if not items:
+                for k, v in data.items():
+                    if isinstance(v, list) and len(v) > 0:
+                        items = v
+                        print(f"[MarketInvestorTrends] Found list in key '{k}', len={len(v)}")
+                        break
+
+            if not items:
+                print(f"[MarketInvestorTrends] No data items found. Full response: {data}")
+                return None
+
+            row = items[0]
+            print(f"[MarketInvestorTrends] keys: {list(row.keys())}")
+            print(f"[MarketInvestorTrends] sample: {row}")
+
+            def safe_int(v):
+                try:
+                    s = str(v).replace(',', '').replace('+', '').strip()
+                    return int(s) if s else 0
+                except:
+                    return 0
+
+            foreign = safe_int(row.get('frgnr_invsr'))
+            finance = safe_int(row.get('fnnc_invt'))
+            insurance = safe_int(row.get('insrnc'))
+            invest_trust = safe_int(row.get('invtrt'))
+            etc_finance = safe_int(row.get('etc_fnnc'))
+            bank = safe_int(row.get('bank'))
+            pension = safe_int(row.get('penfnd_etc'))
+            private_fund = safe_int(row.get('samo_fund'))
+            etc_corp = safe_int(row.get('etc_corp'))
+            individual = safe_int(row.get('ind_invsr'))
+
+            institution = finance + insurance + invest_trust + etc_finance + bank + pension + private_fund
+            if individual == 0 and (foreign != 0 or institution != 0):
+                individual = -(foreign + institution + etc_corp)
+
+            return {
+                'date': row.get('dt', today),
+                'foreign': foreign,
+                'institution': institution,
+                'individual': individual,
+            }
+        except Exception as e:
+            logger.error(f"Market investor trends error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def get_investor_trends_history(self, symbol: str, days: int = 60):
+        """
+        ka10059: 최근 N일 투자자별 매매동향 반환 (기관=소분류합산, 개인=잔여분)
+        amt_qty_tp=1: 수량(주) — HTS 0796 동일
         """
         token = self._get_token()
         if not token: return None
@@ -465,19 +555,19 @@ class KiwoomCollector:
             res = requests.post(url, headers=headers, json={
                 "stk_cd": symbol,
                 "dt": today,
-                "amt_qty_tp": "1",
-                "trde_tp": "0",
+                "amt_qty_tp": "1",  # 수량(주) — HTS 0796 동일
+                "trde_tp": "0",     # 순매수
                 "unit_tp": "0",
-            }, timeout=5)
+            }, timeout=10)
             res.raise_for_status()
             result = res.json()
 
             def safe_int(v):
                 try:
                     s = str(v).replace(',', '').replace('+', '').strip()
-                    return int(s) if s else None
+                    return int(s) if s else 0
                 except:
-                    return None
+                    return 0
 
             rows = []
             for k, v in result.items():
@@ -487,11 +577,34 @@ class KiwoomCollector:
 
             history = []
             for row in rows:
+                foreign = safe_int(row.get('frgnr_invsr'))
+                finance = safe_int(row.get('fnnc_invt'))
+                insurance = safe_int(row.get('insrnc'))
+                invest_trust = safe_int(row.get('invtrt'))
+                etc_finance = safe_int(row.get('etc_fnnc'))
+                bank = safe_int(row.get('bank'))
+                pension = safe_int(row.get('penfnd_etc'))
+                private_fund = safe_int(row.get('samo_fund'))
+                etc_corp = safe_int(row.get('etc_corp'))
+                nation = safe_int(row.get('natn'))
+
+                institution = finance + insurance + invest_trust + etc_finance + bank + pension + private_fund
+                ind_raw = safe_int(row.get('ind_invsr'))
+                individual = ind_raw if ind_raw != 0 else -(foreign + institution + etc_corp + nation)
+
+                # 가격/거래량도 ka10059에서 직접 가져옴 (ka10081 별도 호출 불필요)
+                close_raw = str(row.get('cur_prc', '0')).replace('+', '').replace('-', '').strip()
+                change_raw = str(row.get('pred_pre', '0')).replace('+', '').strip()
+                volume_raw = str(row.get('acc_trde_qty', '0')).replace('+', '').strip()
+
                 history.append({
                     'date': row.get('dt'),
-                    'foreign': safe_int(row.get('frgnr_invsr')),
-                    'institution': safe_int(row.get('orgn')),
-                    'individual': safe_int(row.get('ind_invsr')),
+                    'close': safe_int(close_raw),
+                    'change': safe_int(change_raw),
+                    'volume': safe_int(volume_raw),
+                    'foreign': foreign,
+                    'institution': institution,
+                    'individual': individual,
                 })
             return history
         except Exception as e:

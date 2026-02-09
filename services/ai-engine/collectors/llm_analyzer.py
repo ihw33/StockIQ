@@ -36,7 +36,10 @@ TEAM_SYSTEM_PROMPT = """당신은 신입 애널리스트를 교육하는 StockIQ
 - SF Fed(2025): 유가 3% 상승 → 미국채 수익률 4.5bp 상승
 - Baur & McDermott(2010): 금은 한국 투자자에게 안전자산이 아님
 - ArXiv(2025): BTC는 2024 ETF 승인 이후 위험자산(Risk-ON)으로 행동
-- ScienceDirect(2013): 외국인 선물 순매수 → 익일 현물 수익률 양(+)의 예측력"""
+- ScienceDirect(2013): 외국인 선물 순매수 → 익일 현물 수익률 양(+)의 예측력
+- NY Fed: 2s10s 역전 후 평균 12~18개월 내 경기침체 발생
+- 경험칙: HY spread 400bp↑ = 위험자산 회피, 600bp↑ = 신용경색 경계
+- MOVE 120↑ = 채권시장 불안, 금리 급변 가능"""
 
 
 def _build_user_prompt(macro_data: Dict, news: Dict, portfolio_symbols: Optional[List[dict]] = None) -> str:
@@ -48,10 +51,19 @@ def _build_user_prompt(macro_data: Dict, news: Dict, portfolio_symbols: Optional
     gm = macro_data.get("global_markets", {})
     scores = macro_data.get("scores", {})
 
+    ri = macro_data.get("risk_indicators", {})
+    us2y = ri.get("us2y", {})
+    hy = ri.get("hy_spread", {})
+    mv = ri.get("move", {})
+    ewy = gm.get("ewy", {})
+    us30y = ri.get("us30y", {})
+
     data_section = f"""## 매크로 데이터 ({macro_data.get('date', '?')}, {macro_data.get('kr_market_day', '')}요일)
 미국 시장일: {macro_data.get('us_market_date', '?')} ({macro_data.get('us_market_day', '')}요일)
 
 Tier A (글로벌): DXY {ta.get('dxy',{}).get('value','?')} ({ta.get('dxy',{}).get('change_pct',0):+.2f}%, 스코어:{scores.get('dxy',0)}) | US10Y {ta.get('us10y',{}).get('value','?')} ({ta.get('us10y',{}).get('change_bps',0):+.1f}bp, 스코어:{scores.get('us10y',0)}) | VIX {ta.get('vix',{}).get('value','?')} ({ta.get('vix',{}).get('change_pct',0):+.2f}%, 스코어:{scores.get('vix',0)})
+
+리스크/유동성: US2Y {us2y.get('value','?')} ({us2y.get('change_bps',0):+.1f}bp) | 2s10s {ri.get('spread_2s10s','?')}bp | HY Spread {hy.get('value','?')}bp ({hy.get('change_bps',0):+.1f}bp) | MOVE {mv.get('value','?')} ({mv.get('change_pct',0):+.2f}%) | US30Y {us30y.get('value','?')} ({us30y.get('change_bps',0):+.1f}bp) | EWY {ewy.get('value','?')} ({ewy.get('change_pct',0):+.2f}%)
 
 Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):,}억 (스코어:{scores.get('foreign',0)}) | 선물 {tb.get('futures',{}).get('net',0):,}계약 (스코어:{scores.get('futures',0)}) | 공매도 {tb.get('short_selling',{}).get('change_pct',0):+.1f}% (스코어:{scores.get('short',0)})
 
@@ -117,6 +129,8 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
 알고리즘 연쇄분석이 잡은 신호와 오늘 뉴스가 일치하는지 확인하세요.
 모순이 있으면 어느 쪽을 더 신뢰할지 근거와 함께 판단하세요.
 알고리즘이 놓쳤을 수 있는 뉴스 이벤트가 있으면 지적하세요.
+수익률 곡선(2s10s) 형태가 의미하는 경기 사이클 위치를 해석하세요.
+HY spread + MOVE가 보여주는 신용/금리 리스크 수준을 평가하세요.
 
 ### 4. [업종 전략] 한국 섹터 자금흐름 + 포트폴리오 점검
 위 분석을 바탕으로 오늘 한국에서 자금 유입이 예상되는 섹터와 이탈 예상 섹터를 뉴스 근거와 함께 제시하세요.
@@ -128,6 +142,13 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
 오늘 가장 주의할 변수 1~2개.
 공격적/보수적 투자자별 오늘의 행동 가이드.
 팀 신뢰도 (1~5).
+
+**시나리오 분석** (반드시 포함):
+- 낙관 시나리오: 확률 __%, 조건, KOSPI 예상 방향
+- 기본 시나리오: 확률 __%, 조건, KOSPI 예상 방향
+- 비관 시나리오: 확률 __%, 조건, KOSPI 예상 방향
+
+**[중요]** 이 브리핑은 장 시작 전(AM) 예측입니다. Tier B(외국인/선물/공매도) 수급 데이터가 0이면 아직 장중 집계 전이므로, 글로벌 지표와 뉴스를 기반으로 오늘의 수급 방향을 예측하세요.
 
 답변은 한국어로, 이모지 최소한만 사용하세요.
 단순 데이터 나열이 아닌, "왜 그런지"와 "그래서 어떻게 되는지"에 집중하세요."""
@@ -178,4 +199,102 @@ def generate_team_briefing(
             return None
     except Exception as e:
         logger.error(f"[LLMAnalyzer] Error: {e}")
+        return None
+
+
+PM_SYSTEM_PROMPT = """당신은 StockIQ 매크로 전략팀입니다. 장 마감 후 결산 브리핑을 작성합니다.
+
+## 팀 구성 (AM과 동일)
+[수석 전략가] 오늘 시장 결산. 아침 예측 vs 실제 결과 비교.
+[FX/금리 전문가] 환율·금리 장중 변동 분석. 예상 밖 움직임 해설.
+[퀀트] AM 예측과 실제 수급 교차검증. 적중/빗나간 부분 분석.
+[업종 전략] 실제 섹터별 자금흐름 결산. 보유종목 성과 리뷰.
+[리스크] 내일 주의할 변수. 장 마감 후 발생한 이벤트.
+
+## 핵심 원칙
+1. **아침 예측 vs 실제 비교 필수**: AM 브리핑에서 예측한 내용이 맞았는지 반드시 검증
+2. **적중/오류 솔직히 인정**: 틀린 예측은 왜 틀렸는지 원인 분석
+3. **내일 시사점 도출**: 오늘 결과를 바탕으로 내일 전략 시사점 제시
+4. **Tier B 수급 데이터 활용**: 이제 실제 외국인/선물/공매도 데이터가 있으므로 수급 분석 집중"""
+
+
+def generate_pm_briefing(
+    macro_data: Dict,
+    news: Dict,
+    am_prediction: Optional[str] = None,
+    portfolio_symbols: Optional[List[dict]] = None,
+    model: str = DEFAULT_MODEL,
+) -> Optional[str]:
+    """PM 결산 브리핑 생성 (AM 예측 대비 실제 결과 비교)"""
+    if not OPENROUTER_API_KEY:
+        logger.warning("[LLMAnalyzer] OPENROUTER_API_KEY not set")
+        return None
+
+    # 기존 AM 프롬프트 빌더로 데이터 섹션 구성
+    data_prompt = _build_user_prompt(macro_data, news, portfolio_symbols)
+
+    # AM 예측 텍스트 추가
+    am_section = ""
+    if am_prediction:
+        # 너무 길면 잘라내기
+        am_text = am_prediction[:3000] if len(am_prediction) > 3000 else am_prediction
+        am_section = f"""
+
+## 아침(AM) 예측 브리핑 (비교 대상)
+{am_text}
+"""
+
+    user_prompt = f"""{data_prompt}
+{am_section}
+
+## PM 결산 보고서 작성 지침
+
+### 1. [수석 전략가] 오늘의 결산 한줄 + AM 예측 적중 여부
+아침에 제시한 핵심 테마가 실제로 맞았는지 평가하세요.
+
+### 2. [FX 전문가] 장중 환율·금리 변동 vs AM 예측
+아침 예측과 실제 변동을 비교하고, 차이가 있다면 원인을 분석하세요.
+
+### 3. [퀀트] 수급 데이터 결산 (실제 Tier B 분석)
+이제 실제 외국인현물/선물/공매도 데이터가 있습니다. AM에서 예측한 수급 방향과 비교하세요.
+적중한 부분과 빗나간 부분을 명확히 구분하세요.
+
+### 4. [업종 전략] 실제 섹터 자금흐름 + 보유종목 성과
+실제 수급 기반으로 섹터 분석. 보유종목의 당일 성과와 내일 전략.
+
+### 5. [리스크 & 내일 전망]
+오늘 결과 기반 내일 시사점. 장 마감 후 발생한 이벤트(미국 프리마켓 등).
+팀 신뢰도 (1~5).
+
+답변은 한국어로, 이모지 최소한만 사용하세요."""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": PM_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 5000,
+    }
+
+    try:
+        resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if "choices" in data:
+            text = data["choices"][0]["message"]["content"]
+            usage = data.get("usage", {})
+            logger.info(f"[LLMAnalyzer] PM briefing generated. Tokens: {usage.get('total_tokens', '?')}")
+            return text
+        else:
+            logger.error(f"[LLMAnalyzer] PM unexpected response: {data}")
+            return None
+    except Exception as e:
+        logger.error(f"[LLMAnalyzer] PM Error: {e}")
         return None

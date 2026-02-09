@@ -213,8 +213,9 @@ class MacroDashboardCollector:
         try:
             import yfinance as yf
 
-            tickers = ["DX-Y.NYB", "^TNX", "^VIX", "^IXIC", "^GSPC", "CL=F", "GC=F", "BTC-USD", "KRW=X"]
-            data = yf.download(tickers, period="5d", progress=False, threads=False)
+            tickers = ["DX-Y.NYB", "^TNX", "^VIX", "^IXIC", "^GSPC", "CL=F", "GC=F", "BTC-USD", "KRW=X",
+                       "^MOVE", "EWY", "^TYX"]
+            data = yf.download(tickers, period="7d", progress=False, threads=False)
 
             if data.empty or len(data) < 2:
                 logger.warning("[MacroDashboard] Yahoo Finance data empty")
@@ -227,11 +228,32 @@ class MacroDashboardCollector:
                 }
 
             close = data['Close']
-            today_row = close.iloc[-1]
-            prev_row = close.iloc[-2]
 
-            # US market date from index
-            us_market_dt = data.index[-1]
+            # 주식시장 티커(S&P500)가 있는 행만 필터 — DXY는 선물이라 주말에도 데이터가 있어 잘못된 행이 잡힘
+            stock_close = close[close["^GSPC"].notna()]
+            if len(stock_close) >= 2:
+                today_row = stock_close.iloc[-1]
+                prev_row = stock_close.iloc[-2]
+                us_market_dt = stock_close.index[-1]
+            else:
+                today_row = close.iloc[-1]
+                prev_row = close.iloc[-2]
+                us_market_dt = data.index[-1]
+
+            # BTC, KRW는 최신 데이터 사용 (주말 포함)
+            btc_row = close[close["BTC-USD"].notna()]
+            krw_row = close[close["KRW=X"].notna()]
+            if len(btc_row) > 0:
+                today_row = today_row.copy()
+                today_row["BTC-USD"] = btc_row.iloc[-1]["BTC-USD"]
+                if len(btc_row) >= 2:
+                    prev_row = prev_row.copy()
+                    prev_row["BTC-USD"] = btc_row.iloc[-2]["BTC-USD"]
+            if len(krw_row) > 0:
+                today_row["KRW=X"] = krw_row.iloc[-1]["KRW=X"]
+                if len(krw_row) >= 2:
+                    prev_row["KRW=X"] = krw_row.iloc[-2]["KRW=X"]
+
             us_market_date = us_market_dt.strftime("%Y-%m-%d")
             us_market_day = DAY_NAMES_KR[us_market_dt.weekday()]
 
@@ -282,7 +304,18 @@ class MacroDashboardCollector:
                 "oil": _calc_market("CL=F"),
                 "gold": _calc_market("GC=F"),
                 "bitcoin": _calc_market("BTC-USD"),
+                "ewy": _calc_market("EWY"),
             }
+
+            # --- MOVE Index ---
+            move_val = float(today_row["^MOVE"]) if pd.notna(today_row.get("^MOVE")) else None
+            move_prev = float(prev_row["^MOVE"]) if pd.notna(prev_row.get("^MOVE")) else None
+            move_chg = round(((move_val - move_prev) / move_prev * 100), 3) if (move_val and move_prev) else 0
+
+            # --- US 30Y ---
+            us30y_val = float(today_row["^TYX"]) if pd.notna(today_row.get("^TYX")) else None
+            us30y_prev = float(prev_row["^TYX"]) if pd.notna(prev_row.get("^TYX")) else None
+            us30y_chg_bps = round(((us30y_val - us30y_prev) * 100), 3) if (us30y_val is not None and us30y_prev is not None) else 0
 
             # --- KRW/USD ---
             krw_val = float(today_row["KRW=X"]) if pd.notna(today_row.get("KRW=X")) else None
@@ -298,6 +331,10 @@ class MacroDashboardCollector:
                 "krw_usd": global_markets["krw_usd"],
                 "us_market_date": us_market_date,
                 "us_market_day": us_market_day,
+                "risk_indicators_yf": {
+                    "move": {"value": round(move_val, 2) if move_val else None, "change_pct": move_chg},
+                    "us30y": {"value": round(us30y_val, 3) if us30y_val else None, "change_bps": us30y_chg_bps},
+                },
             }
         except Exception as e:
             logger.error(f"[MacroDashboard] Global all error: {e}")
@@ -308,6 +345,60 @@ class MacroDashboardCollector:
                 "us_market_date": None,
                 "us_market_day": None,
             }
+
+    # ─── FRED API: US 2Y, HY Spread ──────────────────────
+    def collect_fred_indicators(self, us10y_value: Optional[float] = None) -> Dict:
+        """FRED API: US 2Y 금리, HY Spread. 2s10s spread = US10Y - US2Y"""
+        fred_key = os.getenv("FRED_API_KEY")
+        if not fred_key:
+            logger.warning("[MacroDashboard] FRED_API_KEY not set — skipping FRED indicators")
+            return {"us2y": {"value": None, "change_bps": 0}, "spread_2s10s": None, "hy_spread": {"value": None, "change_bps": 0}}
+
+        result = {"us2y": {"value": None, "change_bps": 0}, "spread_2s10s": None, "hy_spread": {"value": None, "change_bps": 0}}
+        try:
+            from fredapi import Fred
+            fred = Fred(api_key=fred_key)
+
+            # US 2Y (DGS2)
+            try:
+                us2y_series = fred.get_series('DGS2', observation_start=(datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d'))
+                us2y_series = us2y_series.dropna()
+                if len(us2y_series) >= 2:
+                    us2y_val = float(us2y_series.iloc[-1])
+                    us2y_prev = float(us2y_series.iloc[-2])
+                    us2y_chg_bps = round((us2y_val - us2y_prev) * 100, 3)
+                    result["us2y"] = {"value": round(us2y_val, 3), "change_bps": us2y_chg_bps}
+
+                    # 2s10s spread
+                    if us10y_value is not None:
+                        result["spread_2s10s"] = round((us10y_value - us2y_val) * 100, 3)  # in bps
+                elif len(us2y_series) == 1:
+                    result["us2y"] = {"value": round(float(us2y_series.iloc[-1]), 3), "change_bps": 0}
+                    if us10y_value is not None:
+                        result["spread_2s10s"] = round((us10y_value - float(us2y_series.iloc[-1])) * 100, 3)
+            except Exception as e:
+                logger.warning(f"[MacroDashboard] FRED DGS2 error: {e}")
+
+            # HY Spread (BAMLH0A0HYM2)
+            try:
+                hy_series = fred.get_series('BAMLH0A0HYM2', observation_start=(datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d'))
+                hy_series = hy_series.dropna()
+                if len(hy_series) >= 2:
+                    hy_val = float(hy_series.iloc[-1])
+                    hy_prev = float(hy_series.iloc[-2])
+                    hy_chg_bps = round((hy_val - hy_prev) * 100, 3)
+                    result["hy_spread"] = {"value": round(hy_val, 3), "change_bps": hy_chg_bps}
+                elif len(hy_series) == 1:
+                    result["hy_spread"] = {"value": round(float(hy_series.iloc[-1]), 3), "change_bps": 0}
+            except Exception as e:
+                logger.warning(f"[MacroDashboard] FRED HY Spread error: {e}")
+
+        except ImportError:
+            logger.warning("[MacroDashboard] fredapi not installed — pip install fredapi")
+        except Exception as e:
+            logger.error(f"[MacroDashboard] FRED error: {e}")
+
+        return result
 
     # ─── Tier B: 외국인 현물 (ka10066) ─────────────────────
     def collect_foreign_cash(self) -> Dict:
@@ -324,6 +415,7 @@ class MacroDashboardCollector:
         }
         body = {
             "stk_cd": "001",
+            "mrkt_tp": "001",
             "strtt_dt": today,
             "end_dt": today,
             "amt_qty_tp": "1",
@@ -345,7 +437,7 @@ class MacroDashboardCollector:
 
             if items:
                 latest = items[0]
-                foreign_net = int(latest.get("frgnr_invsr", "0").replace(",", ""))
+                foreign_net = int(str(latest.get("frgnr_invsr", "0")).replace(",", "").replace("+", ""))
                 score = self._score_foreign_cash(foreign_net)
                 return {"net_amount": foreign_net, "score": score, "raw": items[:3]}
 
@@ -1024,6 +1116,22 @@ class MacroDashboardCollector:
         futures = self.collect_futures()
         short = self.collect_short_selling()
 
+        # FRED indicators (US2Y, HY Spread, 2s10s)
+        us10y_val = global_data.get("us10y", {}).get("value")
+        fred_data = self.collect_fred_indicators(us10y_value=us10y_val)
+
+        # yfinance risk indicators (MOVE, US30Y)
+        yf_risk = global_all.get("risk_indicators_yf", {})
+
+        # Combine into risk_indicators
+        risk_indicators = {
+            "us2y": fred_data.get("us2y", {"value": None, "change_bps": 0}),
+            "spread_2s10s": fred_data.get("spread_2s10s"),
+            "hy_spread": fred_data.get("hy_spread", {"value": None, "change_bps": 0}),
+            "move": yf_risk.get("move", {"value": None, "change_pct": 0}),
+            "us30y": yf_risk.get("us30y", {"value": None, "change_bps": 0}),
+        }
+
         scores = {
             "dxy": global_data["dxy"]["score"],
             "us10y": global_data["us10y"]["score"],
@@ -1062,6 +1170,7 @@ class MacroDashboardCollector:
                 "short_selling": short,
             },
             "global_markets": global_all.get("global_markets", self._empty_global_markets()),
+            "risk_indicators": risk_indicators,
             "scores": scores,
             "overall_score": overall,
             "safety_level": level,

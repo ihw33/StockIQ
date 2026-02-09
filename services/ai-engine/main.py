@@ -653,6 +653,144 @@ async def get_investor_trends(symbol: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/company/{symbol}/investor-history")
+async def get_investor_history(symbol: str, days: int = 60):
+    """종목별 투자자 순매수 히스토리 + 주가 (최근 N일)"""
+    try:
+        kiwoom = KiwoomCollector()
+        d = min(days, 90)
+        history = kiwoom.get_investor_trends_history(symbol, days=d)
+        if not history:
+            return {"status": "no_data", "data": [], "cumulative": None}
+
+        # ka10059 응답에서 가격+투자자 데이터 모두 포함 (ka10081 별도 호출 불필요)
+        # 거래량/대비 0인 첫 행(미래날짜) 제거
+        data = [h for h in history if h.get('volume', 0) > 0 or h.get('close', 0) == 0]
+        if data and data[0].get('volume', 0) == 0 and data[0].get('individual', 0) == 0:
+            data = data[1:]
+
+        # 누적 합산
+        cum = {'foreign': 0, 'institution': 0, 'individual': 0}
+        for h in data:
+            cum['foreign'] += h['foreign']
+            cum['institution'] += h['institution']
+            cum['individual'] += h['individual']
+
+        return {"status": "success", "data": data, "cumulative": cum}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ Market Investor Trends ============
+
+@app.get("/api/market/investor-trends")
+async def get_market_investor_trends():
+    """KOSPI 전체 시장 투자자별 매매동향 (ka10066 via MacroDashboardCollector)"""
+    try:
+        from collectors.macro_dashboard import MacroDashboardCollector
+        collector = MacroDashboardCollector()
+        token = collector._get_token()
+        if not token:
+            return {"status": "no_data", "data": None}
+
+        from datetime import datetime as dt
+        import requests as req
+        today = dt.now().strftime("%Y%m%d")
+        url = f"{collector.base_url}/api/dostk/mrkcond"
+        headers = {
+            "content-type": "application/json;charset=UTF-8",
+            "api-id": "ka10066",
+            "Authorization": f"Bearer {token}"
+        }
+        body = {
+            "stk_cd": "001",
+            "mrkt_tp": "001",
+            "strtt_dt": today,
+            "end_dt": today,
+            "amt_qty_tp": "2",  # 금액(백만원)
+            "trde_tp": "0",
+            "stex_tp": "1"
+        }
+        res = req.post(url, headers=headers, json=body, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+
+        items = data.get("opaf_invsr_trde", [])
+        if not items:
+            for k, v in data.items():
+                if isinstance(v, list) and len(v) > 0:
+                    items = v
+                    break
+
+        if not items:
+            return {"status": "no_data", "data": None}
+
+        # Debug: check structure
+        print(f"[MarketTrends] items count: {len(items)}")
+        if items:
+            print(f"[MarketTrends] first keys: {list(items[0].keys())[:10]}")
+            # Check if there's a total/합계 row
+            for i, item in enumerate(items[:5]):
+                stk_cd = item.get('stk_cd', '')
+                stk_nm = item.get('stk_nm', '')
+                frgnr = item.get('frgnr_invsr', '0')
+                print(f"[MarketTrends] [{i}] stk_cd={stk_cd} stk_nm={stk_nm} frgnr={frgnr}")
+
+        # Sum all rows for market total
+        def safe_int(v):
+            try:
+                s = str(v).replace(',', '').replace('+', '').strip()
+                return int(s) if s else 0
+            except:
+                return 0
+
+        total_foreign = 0
+        total_finance = 0
+        total_insurance = 0
+        total_invest_trust = 0
+        total_etc_finance = 0
+        total_bank = 0
+        total_pension = 0
+        total_private_fund = 0
+        total_etc_corp = 0
+        total_individual = 0
+
+        for row in items:
+            total_foreign += safe_int(row.get('frgnr_invsr'))
+            total_finance += safe_int(row.get('fnnc_invt'))
+            total_insurance += safe_int(row.get('insrnc'))
+            total_invest_trust += safe_int(row.get('invtrt'))
+            total_etc_finance += safe_int(row.get('etc_fnnc'))
+            total_bank += safe_int(row.get('bank'))
+            total_pension += safe_int(row.get('penfnd_etc'))
+            total_private_fund += safe_int(row.get('samo_fund'))
+            total_etc_corp += safe_int(row.get('etc_corp'))
+            total_individual += safe_int(row.get('ind_invsr'))
+
+        institution = total_finance + total_insurance + total_invest_trust + total_etc_finance + total_bank + total_pension + total_private_fund
+        individual = total_individual if total_individual != 0 else -(total_foreign + institution + total_etc_corp)
+
+        print(f"[MarketTrends] TOTAL foreign={total_foreign} institution={institution} individual={individual}")
+
+        # 백만원 → 억원 변환 (100백만 = 1억)
+        return {
+            "status": "success",
+            "data": {
+                "date": today,
+                "foreign": round(total_foreign / 100),
+                "institution": round(institution / 100),
+                "individual": round(individual / 100),
+                "unit": "억원",
+            }
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============ After-Hours Trading Data ============
 
 @app.get("/api/company/{symbol}/after-hours")
@@ -848,7 +986,7 @@ async def run_company_analysis(request: CompanyAnalysisRequest):
 # ============ Macro Dashboard ============
 from collectors.macro_dashboard import MacroDashboardCollector
 from collectors.news_collector import collect_all_news
-from collectors.llm_analyzer import generate_team_briefing
+from collectors.llm_analyzer import generate_team_briefing, generate_pm_briefing
 from collectors.economic_calendar_collector import collect_calendar
 from datetime import date, timedelta
 import json
@@ -856,6 +994,7 @@ import json
 class MacroCollectRequest(BaseModel):
     portfolio: Optional[list] = None  # [{"symbol":"005930","name":"삼성전자","type":"holding"}, ...]
     watchlist: Optional[list] = None  # [{"symbol":"000660","name":"SK하이닉스","type":"watchlist"}, ...]
+    mode: Optional[str] = "am"  # "am" | "manual" | "pm"
 
 def _fetch_holdings_from_kiwoom() -> list:
     """키움 API에서 실제 보유종목 자동 조회"""
@@ -943,21 +1082,41 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
 
         result["economic_calendar"] = calendar_data
 
-        # 6. 뉴스 수집 + LLM 팀 브리핑
+        # 6. 뉴스 수집 + LLM 브리핑 (모드별 분기)
+        mode = request.mode or "am"
         news_data = {}
         llm_analysis = None
+        llm_analysis_pm = None
+        collected_at_pm = None
         try:
             news_data = collect_all_news(portfolio_symbols if portfolio_symbols else None)
             logger.info(f"[Macro] News collected: {len(news_data.get('macro_news', ''))} chars")
 
-            # LLM 분석 (뉴스가 있을 때만)
-            if news_data.get("macro_news"):
+            if mode == "am" and news_data.get("macro_news"):
+                # AM 예측 브리핑
                 llm_analysis = generate_team_briefing(result, news_data, portfolio_symbols if portfolio_symbols else None)
-                logger.info(f"[Macro] LLM briefing: {len(llm_analysis or '')} chars")
+                logger.info(f"[Macro] AM briefing: {len(llm_analysis or '')} chars")
+            elif mode == "pm" and news_data.get("macro_news"):
+                # PM 결산 브리핑: DB에서 당일 AM 예측 가져오기
+                am_prediction = None
+                try:
+                    async with analysis_db.pool.acquire() as conn:
+                        am_row = await conn.fetchrow(
+                            "SELECT llm_analysis FROM macro_daily WHERE date = CURRENT_DATE"
+                        )
+                    if am_row:
+                        am_prediction = am_row["llm_analysis"]
+                except Exception:
+                    pass
+                llm_analysis_pm = generate_pm_briefing(result, news_data, am_prediction, portfolio_symbols if portfolio_symbols else None)
+                collected_at_pm = dt_datetime.now(pytz.timezone('Asia/Seoul'))
+                logger.info(f"[Macro] PM briefing: {len(llm_analysis_pm or '')} chars")
+            # manual 모드: LLM 호출 없음 (데이터만 갱신)
         except Exception as news_err:
             logger.warning(f"[Macro] News/LLM error (non-fatal): {news_err}")
 
         result["llm_analysis"] = llm_analysis or ""
+        result["llm_analysis_pm"] = llm_analysis_pm or ""
         result["news_context"] = news_data.get("macro_news", "")
 
         # 5. DB upsert
@@ -965,8 +1124,9 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
         if adjusted_weights:
             accuracy_data = collector.calculate_indicator_accuracy([dict(r) for r in rows])
 
-        # global_markets 추출
+        # global_markets + risk_indicators 추출
         gm = result.get("global_markets", {})
+        ri = result.get("risk_indicators", {})
 
         async with analysis_db.pool.acquire() as conn:
             await conn.execute("""
@@ -986,13 +1146,21 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                  gold_value, gold_change_pct,
                  bitcoin_value, bitcoin_change_pct,
                  krw_usd_value, krw_usd_change, krw_usd_change_pct, chain_analysis,
-                 llm_analysis, news_context, economic_calendar)
+                 llm_analysis, news_context, economic_calendar,
+                 llm_analysis_pm, collected_at_pm,
+                 us2y_value, us2y_change_bps, spread_2s10s,
+                 us30y_value, us30y_change_bps,
+                 hy_spread_value, hy_spread_change_bps,
+                 move_value, move_change_pct,
+                 ewy_value, ewy_change_pct)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                         $11, $12, $13, $14, $15, $16, $17,
                         $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb,
                         $25, $26, $27,
                         $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
-                        $38, $39, $40, $41, $42, $43, $44::jsonb)
+                        $38, $39, $40, $41, $42, $43, $44::jsonb,
+                        $45, $46,
+                        $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57)
                 ON CONFLICT (date) DO UPDATE SET
                     dxy_value = EXCLUDED.dxy_value, dxy_change_pct = EXCLUDED.dxy_change_pct, dxy_score = EXCLUDED.dxy_score,
                     us10y_value = EXCLUDED.us10y_value, us10y_change_bps = EXCLUDED.us10y_change_bps, us10y_score = EXCLUDED.us10y_score,
@@ -1012,9 +1180,17 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                     bitcoin_value = EXCLUDED.bitcoin_value, bitcoin_change_pct = EXCLUDED.bitcoin_change_pct,
                     krw_usd_value = EXCLUDED.krw_usd_value, krw_usd_change = EXCLUDED.krw_usd_change, krw_usd_change_pct = EXCLUDED.krw_usd_change_pct,
                     chain_analysis = EXCLUDED.chain_analysis,
-                    llm_analysis = EXCLUDED.llm_analysis,
+                    llm_analysis = COALESCE(EXCLUDED.llm_analysis, macro_daily.llm_analysis),
+                    llm_analysis_pm = COALESCE(EXCLUDED.llm_analysis_pm, macro_daily.llm_analysis_pm),
+                    collected_at_pm = COALESCE(EXCLUDED.collected_at_pm, macro_daily.collected_at_pm),
                     news_context = EXCLUDED.news_context,
                     economic_calendar = EXCLUDED.economic_calendar,
+                    us2y_value = EXCLUDED.us2y_value, us2y_change_bps = EXCLUDED.us2y_change_bps,
+                    spread_2s10s = EXCLUDED.spread_2s10s,
+                    us30y_value = EXCLUDED.us30y_value, us30y_change_bps = EXCLUDED.us30y_change_bps,
+                    hy_spread_value = EXCLUDED.hy_spread_value, hy_spread_change_bps = EXCLUDED.hy_spread_change_bps,
+                    move_value = EXCLUDED.move_value, move_change_pct = EXCLUDED.move_change_pct,
+                    ewy_value = EXCLUDED.ewy_value, ewy_change_pct = EXCLUDED.ewy_change_pct,
                     updated_at = NOW()
             """,
             date.fromisoformat(result["date"]),
@@ -1038,9 +1214,17 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
             gm.get("bitcoin", {}).get("value"), gm.get("bitcoin", {}).get("change_pct"),
             gm.get("krw_usd", {}).get("value"), gm.get("krw_usd", {}).get("change"), gm.get("krw_usd", {}).get("change_pct"),
             result.get("chain_analysis"),
-            result.get("llm_analysis"),
+            llm_analysis if llm_analysis else None,
             result.get("news_context"),
             json.dumps(result.get("economic_calendar")) if result.get("economic_calendar") else None,
+            llm_analysis_pm if llm_analysis_pm else None,
+            collected_at_pm,
+            ri.get("us2y", {}).get("value"), ri.get("us2y", {}).get("change_bps"),
+            ri.get("spread_2s10s"),
+            ri.get("us30y", {}).get("value"), ri.get("us30y", {}).get("change_bps"),
+            ri.get("hy_spread", {}).get("value"), ri.get("hy_spread", {}).get("change_bps"),
+            ri.get("move", {}).get("value"), ri.get("move", {}).get("change_pct"),
+            gm.get("ewy", {}).get("value"), gm.get("ewy", {}).get("change_pct"),
             )
 
         return {"status": "success", "data": result}
@@ -1079,6 +1263,21 @@ async def get_macro_today():
             collector = MacroDashboardCollector()
             daily_review = collector.generate_daily_review(dict(yesterday_row))
 
+        # 전일 Tier B 확정 데이터 (전일 마감 잔고)
+        yesterday_tier_b = None
+        if yesterday_row:
+            yd = dict(yesterday_row)
+            yesterday_tier_b = {
+                "date": yd["date"].isoformat() if hasattr(yd["date"], "isoformat") else str(yd["date"]),
+                "foreign_cash": {"net_amount": yd.get("foreign_net_amount"), "score": yd.get("foreign_score")},
+                "futures": {"net": yd.get("futures_net"), "score": yd.get("futures_score")},
+                "short_selling": {
+                    "volume": yd.get("short_volume"),
+                    "change_pct": float(yd["short_change_pct"]) if yd.get("short_change_pct") is not None else 0,
+                    "score": yd.get("short_score"),
+                },
+            }
+
         # 적중률 + 가중치
         accuracy = None
         weights = None
@@ -1097,6 +1296,7 @@ async def get_macro_today():
             "status": "success",
             "data": today_data,
             "daily_review": daily_review,
+            "yesterday_tier_b": yesterday_tier_b,
             "accuracy": accuracy,
             "adjusted_weights": weights
         }
@@ -1332,6 +1532,14 @@ def _macro_row_to_dict(row) -> dict:
             "gold": {"value": _safe_float("gold_value"), "change_pct": _safe_float_or_zero("gold_change_pct")},
             "bitcoin": {"value": _safe_float("bitcoin_value"), "change_pct": _safe_float_or_zero("bitcoin_change_pct")},
             "krw_usd": {"value": _safe_float("krw_usd_value"), "change": _safe_float_or_zero("krw_usd_change"), "change_pct": _safe_float_or_zero("krw_usd_change_pct")},
+            "ewy": {"value": _safe_float("ewy_value"), "change_pct": _safe_float_or_zero("ewy_change_pct")},
+        },
+        "risk_indicators": {
+            "us2y": {"value": _safe_float("us2y_value"), "change_bps": _safe_float_or_zero("us2y_change_bps")},
+            "spread_2s10s": _safe_float("spread_2s10s"),
+            "hy_spread": {"value": _safe_float("hy_spread_value"), "change_bps": _safe_float_or_zero("hy_spread_change_bps")},
+            "move": {"value": _safe_float("move_value"), "change_pct": _safe_float_or_zero("move_change_pct")},
+            "us30y": {"value": _safe_float("us30y_value"), "change_bps": _safe_float_or_zero("us30y_change_bps")},
         },
         "overall_score": _safe_float_or_zero("overall_score"),
         "safety_level": d.get("safety_level"),
@@ -1339,6 +1547,8 @@ def _macro_row_to_dict(row) -> dict:
         "interpretation": d.get("interpretation"),
         "chain_analysis": d.get("chain_analysis", ""),
         "llm_analysis": d.get("llm_analysis", ""),
+        "llm_analysis_pm": d.get("llm_analysis_pm", ""),
+        "collected_at_pm": d["collected_at_pm"].isoformat() if d.get("collected_at_pm") else None,
         "news_context": d.get("news_context", ""),
         "economic_calendar": d.get("economic_calendar"),
     }
@@ -1350,39 +1560,58 @@ import pytz
 
 _macro_scheduler_running = False
 
-async def _run_macro_collection():
+async def _run_macro_collection(mode: str = "am"):
     """매크로 데이터 수집 (collect_macro_data 로직 재사용)"""
     try:
-        print(f"[Macro Scheduler] 수집 시작: {dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%H:%M:%S')}")
-        await collect_macro_data()
-        print(f"[Macro Scheduler] 수집 완료")
+        print(f"[Macro Scheduler] {mode.upper()} 수집 시작: {dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%H:%M:%S')}")
+        await collect_macro_data(MacroCollectRequest(mode=mode))
+        print(f"[Macro Scheduler] {mode.upper()} 수집 완료")
     except Exception as e:
-        print(f"[Macro Scheduler] 수집 실패: {e}")
+        print(f"[Macro Scheduler] {mode.upper()} 수집 실패: {e}")
+
+SCHEDULE = [
+    {"hour": 7, "minute": 0, "mode": "am"},
+    {"hour": 18, "minute": 0, "mode": "pm"},
+]
 
 async def _macro_scheduler():
     """
-    매크로 자동 스케줄러: 평일(월~금) 07:00 KST 1회 수집
-    매크로 + 뉴스 + LLM 브리핑 자동 생성
-    주말 건너뜀 — 금요일 미국 마감 데이터는 월요일 07:00에 반영
+    매크로 자동 스케줄러: 평일(월~금) 07:00 AM + 18:00 PM KST 수집
+    AM: 글로벌 지표 + 뉴스 + 예측 브리핑
+    PM: 확정 수급 + 뉴스 + 결산 브리핑
+    주말 건너뜀
     """
     global _macro_scheduler_running
     _macro_scheduler_running = True
     kst = pytz.timezone('Asia/Seoul')
     from datetime import timedelta
-    TARGET_HOUR = 7
-    TARGET_MINUTE = 0
-    print(f"[Macro Scheduler] 시작 — 평일 {TARGET_HOUR:02d}:{TARGET_MINUTE:02d} KST 자동 수집 (주말 제외)")
+    print(f"[Macro Scheduler] 시작 — 평일 07:00(AM) + 18:00(PM) KST 자동 수집 (주말 제외)")
 
     while _macro_scheduler_running:
         try:
             now = dt_datetime.now(kst)
 
-            # 다음 평일 07:00 계산
-            target_today = now.replace(hour=TARGET_HOUR, minute=TARGET_MINUTE, second=0, microsecond=0)
-            if now >= target_today:
-                next_run = target_today + timedelta(days=1)
-            else:
-                next_run = target_today
+            # 다음 스케줄 슬롯 계산
+            next_run = None
+            next_mode = "am"
+            for slot in SCHEDULE:
+                target = now.replace(hour=slot["hour"], minute=slot["minute"], second=0, microsecond=0)
+                if now < target:
+                    # 아직 안 지남 → 오늘 이 슬롯
+                    candidate = target
+                else:
+                    continue
+                if next_run is None or candidate < next_run:
+                    next_run = candidate
+                    next_mode = slot["mode"]
+
+            # 오늘 남은 슬롯이 없으면 내일 첫 슬롯
+            if next_run is None:
+                tomorrow = (now + timedelta(days=1)).replace(
+                    hour=SCHEDULE[0]["hour"], minute=SCHEDULE[0]["minute"], second=0, microsecond=0
+                )
+                next_run = tomorrow
+                next_mode = SCHEDULE[0]["mode"]
 
             # 주말이면 월요일로 이동 (토=5, 일=6)
             while next_run.weekday() >= 5:
@@ -1390,7 +1619,7 @@ async def _macro_scheduler():
 
             wait_seconds = (next_run - now).total_seconds()
             next_day_name = ['월','화','수','목','금','토','일'][next_run.weekday()]
-            print(f"[Macro Scheduler] 다음 수집: {next_run.strftime('%Y-%m-%d')}({next_day_name}) {TARGET_HOUR:02d}:{TARGET_MINUTE:02d} KST ({wait_seconds/3600:.1f}시간 후)")
+            print(f"[Macro Scheduler] 다음 수집: {next_run.strftime('%Y-%m-%d')}({next_day_name}) {next_run.strftime('%H:%M')} KST [{next_mode.upper()}] ({wait_seconds/3600:.1f}시간 후)")
 
             # 대기 (30초 간격으로 체크하며 대기 — 종료 신호 감지용)
             while wait_seconds > 0 and _macro_scheduler_running:
@@ -1402,9 +1631,9 @@ async def _macro_scheduler():
                 break
 
             # 수집 실행
-            print(f"[Macro Scheduler] === {dt_datetime.now(kst).strftime('%Y-%m-%d %H:%M')} 일일 수집 시작 ===")
-            await _run_macro_collection()
-            print(f"[Macro Scheduler] === 일일 수집 완료 ===")
+            print(f"[Macro Scheduler] === {dt_datetime.now(kst).strftime('%Y-%m-%d %H:%M')} {next_mode.upper()} 수집 시작 ===")
+            await _run_macro_collection(next_mode)
+            print(f"[Macro Scheduler] === {next_mode.upper()} 수집 완료 ===")
 
             # 수집 후 1분 대기 (중복 실행 방지)
             await asyncio.sleep(60)
