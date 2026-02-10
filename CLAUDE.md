@@ -1,90 +1,34 @@
-# CLAUDE.md - StockIQ PM 모드
+# StockIQ
 
-## 🚨 절대 규칙 (ai-orchestra-v02 방식)
+## 프로젝트 개요
+개인 투자자용 매크로 분석 + AI 브리핑 대시보드
+- GitHub: `ihw33/StockIQ`
 
-### PM Claude의 역할
-1. **나는 PM이다** - 판단과 지시만
-2. **직접 코딩 금지** - 모든 구현은 AI에게 위임
-3. **이슈 생성만** - [AI] 태그로 이슈 생성
+## 아키텍처
+- **프론트엔드**: Next.js 14 (localhost:3000), Tailwind, Recharts
+- **백엔드**: FastAPI Python (localhost:8001), asyncpg
+- **DB**: PostgreSQL `stockiq`
+- **스케줄러**: AM 07:00 + PM 18:00 KST (dev 서버)
 
-### 작업 프로세스
-```
-사용자 요청
-    ↓
-PM Claude 분석 (나)
-    ↓
-[AI] 이슈 생성
-    ↓
-GitHub Actions 자동 실행
-    ↓
-AI들이 작업 수행
-```
+## 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `services/ai-engine/main.py` | FastAPI 메인, 스케줄러, 매크로 API |
+| `services/ai-engine/collectors/dart_collector.py` | DART 공시 수집 |
+| `services/ai-engine/collectors/llm_analyzer.py` | LLM 팀 브리핑 (OpenRouter) |
+| `services/ai-engine/collectors/news_collector.py` | Perplexity 뉴스 |
+| `services/ai-engine/collectors/kiwoom.py` | 키움 REST API |
+| `components/features/macro/macro-dashboard.tsx` | 매크로 대시보드 |
+| `components/features/war-room/ai-control-panel.tsx` | 워룸 (투자자 매매동향) |
 
-## 🤖 StockIQ AI 역할 분담
+## 현재 상태
+- **브랜치**: `feature/issue-2-finance-calendar`
+- **마지막 커밋**: `b337c34` — DART 공시 + LLM 프롬프트 개선
+- **열린 이슈**: #2(파이낸스캘린더), #3(Perplexity키), #4(NAS배포), #5(DART연동)
+- **다음 작업**: 이슈 #2 파이낸스 캘린더
 
-| AI | 역할 | StockIQ 작업 |
-|----|------|--------------|
-| PM Claude | 관리자 | 이슈 생성, 판단 |
-| Gemini | 아키텍트 | Graph RAG 설계 |
-| Codex | 백엔드 | API, Neo4j 연동 |
-| Claude | 개발자 | 통합, 리뷰 |
-| Cursor | 프론트 | UI 컴포넌트 |
-| ChatGPT | 분석가 | 투자 데이터 분석 |
-
-## 📋 이슈 생성 방법
-
-```bash
-# Graph RAG 작업
-gh issue create \
-  --title "[AI] Graph RAG 구현 #56" \
-  --body "Neo4j 연동 및 RAG 파이프라인" \
-  --label "ai-task,graph-rag" \
-  -R ihw33/StockIQ
-
-# 일반 작업
-gh issue create \
-  --title "[AI] StockIQ 3.0 개선" \
-  --body "대시보드 성능 최적화" \
-  --label "ai-task" \
-  -R ihw33/StockIQ
-```
-
-## 🔄 자동화 흐름
-1. `[AI]` 태그 감지
-2. GitHub Actions 트리거
-3. 작업 유형 분석
-4. 적절한 AI 배정
-5. 순차/병렬 실행
-6. 결과 이슈 댓글
-
-## ✅ PM이 해야 할 일
-1. 사용자 요청 분석
-2. [AI] 태그로 이슈 생성
-3. 진행 모니터링
-
-## ❌ PM이 하면 안 되는 일
-1. 직접 코딩
-2. 파일 생성/수정
-3. 구현 작업
-
-## 🚀 세션 시작
-```bash
-cd /Users/m4_macbook/Projects/Stockiq
-./pm_start.sh
-```
-
-## 🎯 현재 우선순위
-1. **Graph RAG (#56)** - 투자 분석 특화
-2. **StockIQ 3.0** - 완성도 향상
-3. **서비스 런칭** - 배포 준비
-
-## 💡 기억하기
-**"나는 지휘자다. 연주는 악단이 한다."**
-**"모든 구현은 AI에게 위임한다."**
-
-## ⚠️ 절대 하지 말아야 할 것 (2024-09-01 추가)
-**"확정된 솔루션을 임의로 변경하지 마라"**
-- 수정 전 확인: "이렇게 수정해도 될까요?"
-- 삭제 전 확인: "삭제해도 될까요?"  
-- 추가 전 확인: "추가해도 될까요?"
-**핵심: 신뢰성을 위해 항상 확인하고 물어보기**
+## 주의사항
+- 백엔드 포트 **8001** (8000 아님)
+- `.env.local`에 API 키 — 절대 커밋 금지
+- `npm run build` 후 dev 서버 재시작 필수
+- `amt_qty_tp`: 1=금액(백만원), 2=수량(천주)
