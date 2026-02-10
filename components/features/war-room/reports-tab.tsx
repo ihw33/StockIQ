@@ -16,24 +16,13 @@ const FILTER_TABS: { key: FilterMode; label: string }[] = [
 ];
 
 interface ReportsTabProps {
-    initialSessionId?: string | null;
     initialFilter?: FilterMode;
 }
 
-export function ReportsTab({ initialSessionId, initialFilter }: ReportsTabProps = {}) {
+export function ReportsTab({ initialFilter }: ReportsTabProps = {}) {
     const reports = useReportStore((s) => s.reports);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [filter, setFilter] = useState<FilterMode>(initialFilter ?? 'all');
-
-    // Auto-select report by sessionId when provided
-    useEffect(() => {
-        if (!initialSessionId) return;
-        const found = reports.find(r => r.sessionId === initialSessionId);
-        if (found) {
-            setSelectedId(found.id);
-            if (initialFilter) setFilter(initialFilter);
-        }
-    }, [initialSessionId, initialFilter, reports]);
 
     // Sort by timestamp descending
     const sorted = [...reports].sort((a, b) =>
@@ -43,38 +32,17 @@ export function ReportsTab({ initialSessionId, initialFilter }: ReportsTabProps 
     // Apply filter
     const filtered = filter === 'all' ? sorted : sorted.filter(r => r.mode === filter);
 
-    // Group by sessionId
-    const grouped: { key: string; label: string; reports: AnalysisReport[] }[] = [];
-    const sessionMap = new Map<string, AnalysisReport[]>();
-    const standalone: AnalysisReport[] = [];
-
-    for (const r of filtered) {
-        if (r.sessionId) {
-            if (!sessionMap.has(r.sessionId)) sessionMap.set(r.sessionId, []);
-            sessionMap.get(r.sessionId)!.push(r);
-        } else {
-            standalone.push(r);
-        }
-    }
-
-    sessionMap.forEach((items, key) => {
-        const first = items[0];
-        grouped.push({
-            key,
-            label: `${first.symbolName || first.symbol} (${new Date(first.timestamp).toLocaleDateString('ko-KR')})`,
-            reports: items,
-        });
-    });
-
-    standalone.forEach((r) => {
-        grouped.push({
-            key: r.id,
-            label: `${r.symbolName || r.symbol} - ${modeLabel(r.mode)}`,
-            reports: [r],
-        });
-    });
-
     const selectedReport = selectedId ? reports.find(r => r.id === selectedId) : null;
+
+    // Format timestamp as "MM/DD HH:MM"
+    const formatTimestamp = (timestamp: Date) => {
+        const d = new Date(timestamp);
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${month}/${day} ${hours}:${minutes}`;
+    };
 
     return (
         <div className="flex-1 flex flex-col min-h-0">
@@ -115,29 +83,30 @@ export function ReportsTab({ initialSessionId, initialFilter }: ReportsTabProps 
                     {/* Report list */}
                     <ScrollArea className={selectedReport ? 'h-48 shrink-0' : 'flex-1'}>
                         <div className="p-2 space-y-1">
-                            {grouped.map((group) => (
+                            {filtered.map((report) => (
                                 <button
-                                    key={group.key}
-                                    onClick={() => setSelectedId(group.reports[0].id)}
+                                    key={report.id}
+                                    onClick={() => setSelectedId(report.id)}
                                     className={cn(
                                         'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
-                                        selectedId && group.reports.some(r => r.id === selectedId)
+                                        selectedId === report.id
                                             ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-600/30'
                                             : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                     )}
                                 >
-                                    <div className="flex items-center gap-1.5">
-                                        {group.reports.map(r => (
-                                            <span key={r.id} className={cn(
-                                                'px-1.5 py-0.5 rounded text-[10px] font-medium',
-                                                r.mode === 'algo' ? 'bg-blue-500/15 text-blue-400' :
-                                                r.mode === 'company' ? 'bg-amber-500/15 text-amber-400' :
-                                                'bg-purple-500/15 text-purple-400'
-                                            )}>
-                                                {modeBadge(r.mode)}
-                                            </span>
-                                        ))}
-                                        <span className="font-medium truncate">{group.label}</span>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <span className={cn(
+                                            'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                                            report.mode === 'algo' ? 'bg-blue-500/15 text-blue-400' :
+                                            report.mode === 'company' ? 'bg-amber-500/15 text-amber-400' :
+                                            'bg-purple-500/15 text-purple-400'
+                                        )}>
+                                            {modeBadge(report.mode)}
+                                        </span>
+                                        <span className="font-medium">{report.symbolName || report.symbol}</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">
+                                        {formatTimestamp(report.timestamp)}
                                     </div>
                                 </button>
                             ))}
@@ -152,7 +121,7 @@ export function ReportsTab({ initialSessionId, initialFilter }: ReportsTabProps 
                                     {selectedReport.symbolName} - {modeLabel(selectedReport.mode)}
                                 </span>
                                 <span className="text-[10px] text-slate-600">
-                                    {new Date(selectedReport.timestamp).toLocaleString('ko-KR')}
+                                    {formatTimestamp(selectedReport.timestamp)}
                                 </span>
                             </div>
                             <ScrollArea className="flex-1">

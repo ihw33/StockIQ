@@ -244,7 +244,7 @@ interface AIControlPanelProps {
     currentSymbol: string;
     currentName: string;
     recentAlerts?: RecentAlert[];
-    onGoToReports?: (sessionId?: string, mode?: 'algo' | 'llm' | 'company') => void;
+    onGoToReports?: (mode?: 'algo' | 'llm' | 'company') => void;
 }
 
 export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], onGoToReports }: AIControlPanelProps) {
@@ -416,9 +416,9 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                     </div>
                     {recentAlerts.slice(0, 5).map((alert) => (
                         <div
-                            key={alert.id}
+                            key={`${alert.id}-${alert.analyzedAt}`}
                             className="flex items-center gap-2 text-[11px] py-0.5 cursor-pointer hover:bg-slate-800/50 rounded px-1 -mx-1"
-                            onClick={() => onGoToReports?.(`db_${alert.id}`, alert.mode)}
+                            onClick={() => onGoToReports?.(alert.mode)}
                         >
                             <CheckCircle2 className={cn('w-3 h-3 shrink-0',
                                 alert.mode === 'algo' ? 'text-blue-400' :

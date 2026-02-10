@@ -38,7 +38,7 @@ class AnalysisDB:
         stop_loss: Optional[float] = None
     ) -> int:
         """Save analysis result to database.
-        같은 종목 + 같은 타입 + 같은 날짜 → 덮어쓰기 (하루 1건만 유지)
+        매번 새로운 레코드 생성 (모든 분석 히스토리 보존)
         """
         await self.connect()
 
@@ -46,15 +46,6 @@ class AnalysisDB:
         content_json = json.dumps(content, ensure_ascii=False)
 
         async with self.pool.acquire() as conn:
-            # 같은 날 같은 종목+타입 기존 레코드 삭제
-            await conn.execute(
-                """DELETE FROM analysis_history
-                   WHERE symbol = $1
-                     AND analysis_type = $2
-                     AND analyzed_at::date = $3::date""",
-                symbol, analysis_type, now,
-            )
-
             row = await conn.fetchrow(
                 """INSERT INTO analysis_history
                    (symbol, analyzed_at, timeframe, analysis_type, content,
