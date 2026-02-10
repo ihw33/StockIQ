@@ -288,12 +288,28 @@ async def _run_company_analysis_bg(symbol: str):
         except Exception as inv_err:
             print(f"[CompanyAnalysis BG] Investor trends error (non-fatal): {inv_err}")
 
+        dart_context = ""
+        try:
+            overview = get_company_overview(symbol)
+            if overview:
+                est = overview['est_dt']
+                est_fmt = f"{est[:4]}.{est[4:6]}.{est[6:8]}" if len(est) == 8 else est
+                dart_context += f"\n## DART 기업개황\n- 업종: {overview['induty_name']}\n- 대표자: {overview['ceo_nm']}\n- 설립일: {est_fmt}\n"
+
+            filings = collect_dart_filings([{"symbol": symbol, "name": stock_name}], days=3)
+            if filings.get("filings_text"):
+                dart_context += f"\n## 최근 공시 (3일)\n{filings['filings_text']}\n"
+            if dart_context:
+                print(f"[CompanyAnalysis BG] DART context added")
+        except Exception as dart_err:
+            print(f"[CompanyAnalysis BG] DART error (non-fatal): {dart_err}")
+
         user_prompt = f"""다음 기업의 재무 데이터를 분석해주세요:
 
 {data_prompt}
 {macro_context}
 {investor_context}
-
+{dart_context}
 위 데이터를 기반으로 투자 관점의 종합 분석 보고서를 작성해주세요."""
 
         analysis = await llm.a_analyze_text(
@@ -570,12 +586,16 @@ async def get_company_fundamentals(symbol: str):
                               'sales', 'operating_profit', 'net_income', 'dividend_rate', 'market_cap']:
                         if ext_data.get(k) is not None:
                             base[k] = ext_data[k]
+                # Merge DART company overview
+                dart_info = get_company_overview(symbol)
+                if dart_info:
+                    base["dart_overview"] = dart_info
                 return {
                     "status": "success",
                     "source": "cache",
                     "data": base
                 }
-        
+
         # No cache — use the data already fetched above
         data = ext_data
 
@@ -601,7 +621,7 @@ async def get_company_fundamentals(symbol: str):
                 data.get('market_cap')
             )
         
-        return {
+        result = {
             "status": "success",
             "source": "api",
             "data": {
@@ -628,6 +648,11 @@ async def get_company_fundamentals(symbol: str):
                 "dividend_rate": data.get('dividend_rate'),
             }
         }
+        # Merge DART company overview
+        dart_info = get_company_overview(symbol)
+        if dart_info:
+            result["data"]["dart_overview"] = dart_info
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -986,7 +1011,7 @@ async def run_company_analysis(request: CompanyAnalysisRequest):
 # ============ Macro Dashboard ============
 from collectors.macro_dashboard import MacroDashboardCollector
 from collectors.news_collector import collect_all_news
-from collectors.dart_collector import collect_dart_filings
+from collectors.dart_collector import collect_dart_filings, get_company_overview
 from collectors.llm_analyzer import generate_team_briefing, generate_pm_briefing
 from collectors.economic_calendar_collector import collect_calendar
 from datetime import date, timedelta
@@ -1088,6 +1113,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
         news_data = {}
         llm_analysis = None
         llm_analysis_pm = None
+        collected_at_am = None
         collected_at_pm = None
         try:
             news_data = collect_all_news(portfolio_symbols if portfolio_symbols else None)
@@ -1105,6 +1131,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
             if mode == "am" and news_data.get("macro_news"):
                 # AM 예측 브리핑
                 llm_analysis = generate_team_briefing(result, news_data, portfolio_symbols if portfolio_symbols else None)
+                collected_at_am = dt_datetime.now(pytz.timezone('Asia/Seoul'))
                 logger.info(f"[Macro] AM briefing: {len(llm_analysis or '')} chars")
             elif mode == "pm" and news_data.get("macro_news"):
                 # PM 결산 브리핑: DB에서 당일 AM 예측 가져오기
@@ -1127,6 +1154,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
 
         result["llm_analysis"] = llm_analysis or ""
         result["llm_analysis_pm"] = llm_analysis_pm or ""
+        result["collected_at_am"] = collected_at_am.isoformat() if collected_at_am else None
         result["news_context"] = news_data.get("macro_news", "")
 
         # 5. DB upsert
@@ -1162,7 +1190,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                  us30y_value, us30y_change_bps,
                  hy_spread_value, hy_spread_change_bps,
                  move_value, move_change_pct,
-                 ewy_value, ewy_change_pct)
+                 ewy_value, ewy_change_pct, collected_at_am)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                         $11, $12, $13, $14, $15, $16, $17,
                         $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb,
@@ -1170,7 +1198,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                         $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
                         $38, $39, $40, $41, $42, $43, $44::jsonb,
                         $45, $46,
-                        $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57)
+                        $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58)
                 ON CONFLICT (date) DO UPDATE SET
                     dxy_value = EXCLUDED.dxy_value, dxy_change_pct = EXCLUDED.dxy_change_pct, dxy_score = EXCLUDED.dxy_score,
                     us10y_value = EXCLUDED.us10y_value, us10y_change_bps = EXCLUDED.us10y_change_bps, us10y_score = EXCLUDED.us10y_score,
@@ -1201,6 +1229,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                     hy_spread_value = EXCLUDED.hy_spread_value, hy_spread_change_bps = EXCLUDED.hy_spread_change_bps,
                     move_value = EXCLUDED.move_value, move_change_pct = EXCLUDED.move_change_pct,
                     ewy_value = EXCLUDED.ewy_value, ewy_change_pct = EXCLUDED.ewy_change_pct,
+                    collected_at_am = COALESCE(EXCLUDED.collected_at_am, macro_daily.collected_at_am),
                     updated_at = NOW()
             """,
             date.fromisoformat(result["date"]),
@@ -1235,6 +1264,7 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
             ri.get("hy_spread", {}).get("value"), ri.get("hy_spread", {}).get("change_bps"),
             ri.get("move", {}).get("value"), ri.get("move", {}).get("change_pct"),
             gm.get("ewy", {}).get("value"), gm.get("ewy", {}).get("change_pct"),
+            collected_at_am,
             )
 
         return {"status": "success", "data": result}
@@ -1558,6 +1588,7 @@ def _macro_row_to_dict(row) -> dict:
         "chain_analysis": d.get("chain_analysis", ""),
         "llm_analysis": d.get("llm_analysis", ""),
         "llm_analysis_pm": d.get("llm_analysis_pm", ""),
+        "collected_at_am": d["collected_at_am"].isoformat() if d.get("collected_at_am") else None,
         "collected_at_pm": d["collected_at_pm"].isoformat() if d.get("collected_at_pm") else None,
         "news_context": d.get("news_context", ""),
         "economic_calendar": d.get("economic_calendar"),

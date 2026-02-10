@@ -42,40 +42,30 @@ function ReportsContent() {
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [filterMode, setFilterMode] = useState<'all' | 'algo' | 'llm' | 'company'>('all');
 
-    // Group reports by sessionId (or standalone)
+    // Group reports by symbol+date (same symbol on same day = one group)
     const reportGroups = useMemo(() => {
         const groups: Map<string, ReportGroup> = new Map();
 
         for (const report of reports) {
-            if (report.sessionId) {
-                const existing = groups.get(report.sessionId);
-                if (existing) {
-                    if (report.mode === 'algo') existing.algoReport = report;
-                    if (report.mode === 'llm') existing.llmReport = report;
-                    if (report.mode === 'company') existing.companyReport = report;
-                    existing.hasAlgo = existing.hasAlgo || report.mode === 'algo';
-                    existing.hasLlm = existing.hasLlm || report.mode === 'llm';
-                    existing.hasCompany = existing.hasCompany || report.mode === 'company';
-                    existing.hasPosition = existing.hasPosition || !!report.positionInfo;
-                } else {
-                    groups.set(report.sessionId, {
-                        id: report.sessionId,
-                        sessionId: report.sessionId,
-                        symbol: report.symbol,
-                        symbolName: report.symbolName,
-                        timestamp: new Date(report.timestamp),
-                        hasAlgo: report.mode === 'algo',
-                        hasLlm: report.mode === 'llm',
-                        hasCompany: report.mode === 'company',
-                        hasPosition: !!report.positionInfo,
-                        algoReport: report.mode === 'algo' ? report : undefined,
-                        llmReport: report.mode === 'llm' ? report : undefined,
-                        companyReport: report.mode === 'company' ? report : undefined,
-                    });
-                }
+            const dateKey = new Date(report.timestamp).toDateString();
+            const groupKey = `${report.symbol}_${dateKey}`;
+
+            const existing = groups.get(groupKey);
+            if (existing) {
+                if (report.mode === 'algo' && !existing.algoReport) existing.algoReport = report;
+                if (report.mode === 'llm' && !existing.llmReport) existing.llmReport = report;
+                if (report.mode === 'company' && !existing.companyReport) existing.companyReport = report;
+                existing.hasAlgo = existing.hasAlgo || report.mode === 'algo';
+                existing.hasLlm = existing.hasLlm || report.mode === 'llm';
+                existing.hasCompany = existing.hasCompany || report.mode === 'company';
+                existing.hasPosition = existing.hasPosition || !!report.positionInfo;
+                // Keep latest timestamp
+                const ts = new Date(report.timestamp);
+                if (ts > existing.timestamp) existing.timestamp = ts;
             } else {
-                groups.set(report.id, {
-                    id: report.id,
+                groups.set(groupKey, {
+                    id: groupKey,
+                    sessionId: report.sessionId,
                     symbol: report.symbol,
                     symbolName: report.symbolName,
                     timestamp: new Date(report.timestamp),
@@ -205,21 +195,19 @@ function ReportsContent() {
                                             }`}
                                         >
                                             <div className="flex items-center gap-1.5 mb-1">
-                                                {group.hasAlgo && group.hasLlm ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-900/50 text-indigo-300">
-                                                        종합
+                                                {group.hasAlgo && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/50 text-blue-300">
+                                                        알고
                                                     </span>
-                                                ) : group.hasCompany ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/50 text-amber-300">
-                                                        기업
-                                                    </span>
-                                                ) : group.hasLlm ? (
+                                                )}
+                                                {group.hasLlm && (
                                                     <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-900/50 text-purple-300">
                                                         심층
                                                     </span>
-                                                ) : (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/50 text-blue-300">
-                                                        알고
+                                                )}
+                                                {group.hasCompany && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/50 text-amber-300">
+                                                        기업
                                                     </span>
                                                 )}
                                                 {group.hasPosition && (

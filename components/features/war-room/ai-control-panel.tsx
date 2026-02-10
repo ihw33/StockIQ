@@ -25,6 +25,18 @@ interface InvestorCumulative {
 
 // ─── Company data types & evaluation (from company-info-card) ───
 
+interface DartOverview {
+    corp_name: string;
+    stock_name: string;
+    ceo_nm: string;
+    induty_code: string;
+    induty_name: string;
+    est_dt: string;
+    hm_url: string;
+    acc_mt: string;
+    adres: string;
+}
+
 interface CompanyData {
     symbol: string;
     per: number | null;
@@ -47,6 +59,7 @@ interface CompanyData {
     operating_profit: number | null;
     net_income: number | null;
     dividend_rate: number | null;
+    dart_overview?: DartOverview;
 }
 
 type Signal = 'very_good' | 'good' | 'neutral' | 'bad' | 'very_bad';
@@ -523,6 +536,27 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                         {companyData.settle_month && <div>결산 {companyData.settle_month}월</div>}
                                     </div>
                                 </div>
+
+                                {/* DART 기업개황 */}
+                                {companyData.dart_overview && (
+                                    <div className="bg-slate-800/50 rounded-lg p-2.5">
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                            <span className="font-bold text-[11px] text-slate-300">기업 추가정보</span>
+                                            <span className="text-[9px] text-slate-500">DART</span>
+                                        </div>
+                                        <div className="space-y-1 text-[11px] text-slate-400">
+                                            <div className="flex justify-between"><span>업종</span><span className="text-slate-300">{companyData.dart_overview.induty_name}</span></div>
+                                            <div className="flex justify-between"><span>종목명</span><span className="text-slate-300">{companyData.dart_overview.stock_name}</span></div>
+                                            <div className="flex justify-between"><span>대표자</span><span className="text-slate-300">{companyData.dart_overview.ceo_nm}</span></div>
+                                            {companyData.dart_overview.est_dt && (
+                                                <div className="flex justify-between"><span>설립일</span><span className="text-slate-300">{companyData.dart_overview.est_dt.replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3')}</span></div>
+                                            )}
+                                            {companyData.dart_overview.hm_url && (
+                                                <div className="flex justify-between"><span>홈페이지</span><a href={companyData.dart_overview.hm_url.startsWith('http') ? companyData.dart_overview.hm_url : `https://${companyData.dart_overview.hm_url}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline truncate max-w-[120px]">{companyData.dart_overview.hm_url.replace(/^https?:\/\//, '')}</a></div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Summary Opinion */}

@@ -245,6 +245,24 @@ DXY({macro['scores']['dxy']:+d}) | US10Y({macro['scores']['us10y']:+d}) | VIX({m
         import traceback
         traceback.print_exc()
 
+    # DART 기업개황 + 최근 공시
+    dart_context = ""
+    try:
+        from collectors.dart_collector import get_company_overview, collect_dart_filings
+        overview = get_company_overview(symbol)
+        if overview:
+            est = overview['est_dt']
+            est_fmt = f"{est[:4]}.{est[4:6]}.{est[6:8]}" if len(est) == 8 else est
+            dart_context += f"**DART 기업개황:** 업종: {overview['induty_name']} | 대표자: {overview['ceo_nm']} | 설립: {est_fmt}\n"
+
+        filings = collect_dart_filings([{"symbol": symbol, "name": stock_name}], days=3)
+        if filings.get("filings_text"):
+            dart_context += f"**최근 공시 (3일):**\n{filings['filings_text']}\n"
+        if dart_context:
+            print(f"[Prompts] DART context added")
+    except Exception as e:
+        print(f"[Prompts] DART context unavailable (non-fatal): {e}")
+
     # Position info (if available)
     position_context = ""
     if position_info:
@@ -301,7 +319,7 @@ DXY({macro['scores']['dxy']:+d}) | US10Y({macro['scores']['us10y']:+d}) | VIX({m
 {position_context}
 
 ## 📊 시장 상황 요약
-{intraday_info}{us_context}{macro_context}{investor_context}{stress_summary}
+{intraday_info}{us_context}{macro_context}{investor_context}{dart_context}{stress_summary}
 {vol_summary}
 
 ---
@@ -339,7 +357,7 @@ DXY({macro['scores']['dxy']:+d}) | US10Y({macro['scores']['us10y']:+d}) | VIX({m
         context = f"""
 # {symbol} 기술적 분석 결과
 
-{intraday_info}{us_context}{macro_context}{investor_context}{stress_summary}
+{intraday_info}{us_context}{macro_context}{investor_context}{dart_context}{stress_summary}
 {vol_summary}{strategy_warning}
 
 ---

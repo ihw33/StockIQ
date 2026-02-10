@@ -70,6 +70,7 @@ interface MacroData {
     chain_analysis?: string;
     llm_analysis?: string;
     llm_analysis_pm?: string;
+    collected_at_am?: string;
     collected_at_pm?: string;
     news_context?: string;
     economic_calendar?: {
@@ -769,6 +770,25 @@ export function MacroDashboard() {
         }
     };
 
+    const [generatingBriefing, setGeneratingBriefing] = useState(false);
+
+    const handleGenerateBriefing = async () => {
+        setGeneratingBriefing(true);
+        try {
+            const res = await fetch('/api/macro', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'am' }),
+            });
+            const json = await res.json();
+            if (json.data) setData(json.data);
+        } catch (e) {
+            console.error('Briefing generate error:', e);
+        } finally {
+            setGeneratingBriefing(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -1336,17 +1356,23 @@ export function MacroDashboard() {
                     <h3 className="text-sm font-bold text-purple-300 flex items-center gap-2">
                         <Sparkles className="w-4 h-4" />
                         AM 예측 브리핑
-                        <span className="text-[10px] font-normal text-purple-400/60">07:00</span>
+                        {displayData.collected_at_am ? (
+                            <span className="text-xs font-medium text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">
+                                {new Date(displayData.collected_at_am).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-normal text-purple-400/60">자동 07:00 / 18:00</span>
+                        )}
                     </h3>
                     <div className="flex items-center gap-2">
-                        {!displayData.llm_analysis && !collecting && (
+                        {!isViewingPast && (
                             <button
-                                onClick={handleCollect}
-                                disabled={collecting}
+                                onClick={handleGenerateBriefing}
+                                disabled={generatingBriefing}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white rounded-lg transition-colors"
                             >
-                                <Sparkles className={`w-3 h-3 ${collecting ? 'animate-spin' : ''}`} />
-                                브리핑 생성
+                                <Sparkles className={`w-3 h-3 ${generatingBriefing ? 'animate-spin' : ''}`} />
+                                {generatingBriefing ? '생성 중...' : displayData.llm_analysis ? '재생성' : '브리핑 생성'}
                             </button>
                         )}
                         {displayData.llm_analysis && (
@@ -1360,12 +1386,12 @@ export function MacroDashboard() {
                         )}
                     </div>
                 </div>
-                {!displayData.llm_analysis && !collecting && (
+                {!displayData.llm_analysis && !generatingBriefing && (
                     <p className="mt-3 text-xs text-slate-500">
-                        AM 예측 브리핑이 아직 없습니다. 매일 07:00 자동 생성됩니다.
+                        AM 예측 브리핑이 아직 없습니다. 매일 07:00 자동 생성되거나 위 버튼으로 수동 생성하세요.
                     </p>
                 )}
-                {collecting && !displayData.llm_analysis && (
+                {generatingBriefing && (
                     <div className="mt-3 flex items-center gap-2 text-xs text-purple-400">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         매크로 수집 + 뉴스 분석 + LLM 브리핑 생성 중... (약 1~2분)
@@ -1376,7 +1402,7 @@ export function MacroDashboard() {
                         <LlmBriefingContent content={displayData.llm_analysis} />
                     </div>
                 )}
-                {!llmOpen && displayData.llm_analysis && (
+                {!llmOpen && displayData.llm_analysis && !generatingBriefing && (
                     <p className="mt-2 text-xs text-slate-500 truncate">
                         {displayData.llm_analysis.split('\n').find(l => l.trim() && !l.startsWith('#'))?.trim().slice(0, 120) || '브리핑이 준비되었습니다.'}...
                     </p>
