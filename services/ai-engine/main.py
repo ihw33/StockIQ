@@ -986,6 +986,7 @@ async def run_company_analysis(request: CompanyAnalysisRequest):
 # ============ Macro Dashboard ============
 from collectors.macro_dashboard import MacroDashboardCollector
 from collectors.news_collector import collect_all_news
+from collectors.dart_collector import collect_dart_filings
 from collectors.llm_analyzer import generate_team_briefing, generate_pm_briefing
 from collectors.economic_calendar_collector import collect_calendar
 from datetime import date, timedelta
@@ -1091,6 +1092,15 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
         try:
             news_data = collect_all_news(portfolio_symbols if portfolio_symbols else None)
             logger.info(f"[Macro] News collected: {len(news_data.get('macro_news', ''))} chars")
+
+            # DART 공시 수집 (보유종목)
+            try:
+                dart_data = collect_dart_filings(portfolio_symbols if portfolio_symbols else [], days=3)
+                if dart_data.get("filings_text"):
+                    news_data["dart_filings"] = dart_data["filings_text"]
+                    logger.info(f"[Macro] DART filings: {len(dart_data.get('filings', []))}건")
+            except Exception as dart_err:
+                logger.warning(f"[Macro] DART error (non-fatal): {dart_err}")
 
             if mode == "am" and news_data.get("macro_news"):
                 # AM 예측 브리핑

@@ -538,7 +538,8 @@ class KiwoomCollector:
     def get_investor_trends_history(self, symbol: str, days: int = 60):
         """
         ka10059: 최근 N일 투자자별 매매동향 반환 (기관=소분류합산, 개인=잔여분)
-        amt_qty_tp=1: 수량(주) — HTS 0796 동일
+        amt_qty_tp=1: 금액(백만원), amt_qty_tp=2: 수량(천주)
+        정규장만 반환 (시간외 미포함)
         """
         token = self._get_token()
         if not token: return None
@@ -555,7 +556,7 @@ class KiwoomCollector:
             res = requests.post(url, headers=headers, json={
                 "stk_cd": symbol,
                 "dt": today,
-                "amt_qty_tp": "1",  # 수량(주) — HTS 0796 동일
+                "amt_qty_tp": "1",  # 금액(백만원) — 정규장만
                 "trde_tp": "0",     # 순매수
                 "unit_tp": "0",
             }, timeout=10)

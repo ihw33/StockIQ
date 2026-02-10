@@ -939,6 +939,49 @@ export function MacroDashboard() {
             {/* Daily Review */}
             {displayReview && <DailyReviewCard review={displayReview} />}
 
+            {/* Parse chain analysis into sections */}
+            {(() => {
+                const ca = displayData.chain_analysis || '';
+                const sections: Record<string, string> = {};
+                if (ca) {
+                    const sectionRegex = /\[\s*(\d+)\.\s*([^\]]+)\]/g;
+                    const summaryRegex = /\[\s*종합[^\]]*\]/;
+                    const parts = ca.split(/(?=\[\s*\d+\.\s*)/);
+                    for (const part of parts) {
+                        const m = part.match(/\[\s*(\d+)\.\s*([^\]]+)\]/);
+                        if (m) {
+                            const lines = part.split('\n').slice(1).filter(l => l.trim()).map(l => l.trim());
+                            sections[m[1]] = lines.join('\n');
+                        }
+                    }
+                    // Extract 종합 + 대응 구간
+                    const summaryIdx = ca.indexOf('[ 종합');
+                    if (summaryIdx >= 0) sections['summary'] = ca.slice(summaryIdx);
+                    else {
+                        const lastDash = ca.lastIndexOf('━━━');
+                        if (lastDash >= 0 && ca.indexOf('선별적 대응') > 0) {
+                            const actionIdx = ca.lastIndexOf('━━━', ca.indexOf('선별적 대응'));
+                            if (actionIdx >= 0) sections['summary'] = ca.slice(actionIdx);
+                        }
+                    }
+                }
+
+                const ChainSnippet = ({ text }: { text: string }) => (
+                    <div className="mt-2 rounded border border-blue-900/30 bg-blue-950/10 px-3 py-2">
+                        <div className="text-[13px] text-slate-400 leading-relaxed">
+                            {text.split('\n').map((line, i) => {
+                                const t = line.trim();
+                                if (t.startsWith('→')) return <div key={i} className="text-slate-500 ml-2">{t}</div>;
+                                if (t.startsWith('(근거:')) return <div key={i} className="text-slate-600 ml-2 text-[12px]">{t}</div>;
+                                if (t) return <div key={i}>{t}</div>;
+                                return null;
+                            })}
+                        </div>
+                    </div>
+                );
+
+                return (<>
+
             {/* Global Markets */}
             {displayData.global_markets && (
                 <div>
@@ -994,6 +1037,7 @@ export function MacroDashboard() {
                             />
                         )}
                     </div>
+                    {sections['2'] && <ChainSnippet text={sections['2']} />}
                 </div>
             )}
 
@@ -1037,6 +1081,9 @@ export function MacroDashboard() {
                         rawValue={displayData.tier_a.vix.value || 20}
                     />
                 </div>
+                {(sections['1'] || sections['3'] || sections['4']) && (
+                    <ChainSnippet text={[sections['1'], sections['3'], sections['4']].filter(Boolean).join('\n')} />
+                )}
             </div>
 
             {/* Risk / Liquidity Indicators (Tier A+) */}
@@ -1102,6 +1149,39 @@ export function MacroDashboard() {
                             })()}
                         />
                     </div>
+                    {(() => {
+                        const ri = displayData.risk_indicators;
+                        const ewy = displayData.global_markets?.ewy;
+                        const lines: string[] = [];
+                        // 2s10s
+                        const spread = ri.spread_2s10s;
+                        if (spread != null) {
+                            if (spread < 0) lines.push(`2s10s 스프레드 ${spread.toFixed(0)}bp 역전 — 경기 침체 신호, 방어적 포지션 필요.`);
+                            else if (spread < 30) lines.push(`2s10s 스프레드 ${spread.toFixed(0)}bp로 평탄화 진행 중 — 경기 둔화 우려 주시.`);
+                            else lines.push(`2s10s 스프레드 ${spread.toFixed(0)}bp 정상 범위 — 수익률 곡선 건전, 침체 신호 없음.`);
+                        }
+                        // HY
+                        const hy = ri.hy_spread?.value;
+                        if (hy != null) {
+                            if (hy >= 600) lines.push(`HY 스프레드 ${hy.toFixed(0)}bp — 신용경색 구간, 위험자산 회피 강화.`);
+                            else if (hy >= 400) lines.push(`HY 스프레드 ${hy.toFixed(0)}bp — 위험회피 심화, 신용 리스크 경계.`);
+                            else lines.push(`HY 스프레드 ${hy.toFixed(0)}bp — ${hy < 300 ? '매우 양호한' : '안정적인'} 신용 환경.`);
+                        }
+                        // MOVE
+                        const mv = ri.move?.value;
+                        if (mv != null) {
+                            if (mv >= 120) lines.push(`MOVE ${mv.toFixed(0)} — 채권 변동성 경계 구간, 금리 급변 리스크 주의.`);
+                            else lines.push(`MOVE ${mv.toFixed(0)} — 채권 변동성 정상 범위, 금리 급변 리스크 낮음.`);
+                        }
+                        // EWY
+                        if (ewy?.change_pct != null) {
+                            const chg = ewy.change_pct;
+                            if (chg > 1) lines.push(`EWY ${chg > 0 ? '+' : ''}${chg.toFixed(1)}% — 외국인 한국 투자 심리 긍정적.`);
+                            else if (chg < -1) lines.push(`EWY ${chg.toFixed(1)}% — 외국인 한국 투자 심리 위축.`);
+                            else lines.push(`EWY ${chg > 0 ? '+' : ''}${chg.toFixed(1)}% — 외국인 시각 중립.`);
+                        }
+                        return lines.length > 0 ? <ChainSnippet text={lines.join('\n')} /> : null;
+                    })()}
                 </div>
             )}
 
@@ -1177,17 +1257,18 @@ export function MacroDashboard() {
                         rawValue={displayData.tier_b.short_selling.change_pct || 0}
                     />
                 </div>
+                {sections['5'] && <ChainSnippet text={sections['5']} />}
             </div>
 
-            {/* Chain Analysis */}
-            {displayData.chain_analysis && (
+            {/* Chain Analysis — Summary only */}
+            {sections['summary'] && (
                 <div className="rounded-lg border border-blue-900/50 bg-blue-950/20 p-5">
                     <h3 className="text-sm font-bold text-blue-300 mb-3 flex items-center gap-2">
                         <span>⚙️</span>
-                        <span>연쇄 분석: 오늘의 자금 흐름</span>
+                        <span>종합 분석</span>
                     </h3>
                     <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line font-mono">
-                        {displayData.chain_analysis.split('\n').map((line, i) => {
+                        {sections['summary'].split('\n').map((line, i) => {
                             const trimmed = line.trimStart();
                             // Section headers
                             if (trimmed.startsWith('[ ') || trimmed.startsWith('━━━')) {
@@ -1245,6 +1326,9 @@ export function MacroDashboard() {
                     </div>
                 </div>
             )}
+
+                </>);
+            })()}
 
             {/* AM 예측 브리핑 */}
             <div className="rounded-lg border border-purple-900/50 bg-purple-950/20 p-5">

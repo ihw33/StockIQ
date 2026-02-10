@@ -535,38 +535,39 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
 
                             {/* Investor Daily Table (0796 style) */}
                             {investorHistory.length > 0 && (() => {
-                                const fmtQty = (v: number) => {
-                                    const abs = Math.abs(v);
+                                const fmtAmt = (v: number) => {
                                     const s = v > 0 ? '+' : v < 0 ? '-' : '';
-                                    if (abs >= 1_000_000) return `${s}${(abs / 1_000_000).toFixed(1)}M`;
-                                    if (abs >= 1_000) return `${s}${Math.round(abs / 1_000)}K`;
-                                    return `${s}${abs}`;
+                                    const abs = Math.abs(v);
+                                    return `${s}${abs.toLocaleString()}`;
                                 };
                                 const clr = (v: number) => v > 0 ? 'text-red-400' : v < 0 ? 'text-blue-400' : 'text-slate-600';
                                 return (
                                 <div className="bg-slate-800/50 rounded-lg p-2 mt-3">
-                                    <span className="font-bold text-xs text-slate-300">투자자별 매매동향 <span className="text-slate-500 font-normal">(주)</span></span>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-xs text-slate-300">투자자별 매매동향 <span className="text-slate-500 font-normal">(정규장)</span></span>
+                                        <span className="text-[10px] text-slate-500">단위: 백만원</span>
+                                    </div>
 
                                     {/* Cumulative */}
                                     {investorCumulative && (
                                         <div className="flex items-center gap-1.5 mt-1.5 mb-2 text-[11px] bg-slate-900/50 rounded px-2 py-1">
                                             <span className="text-slate-500">누적</span>
                                             <span className={clr(investorCumulative.individual)}>
-                                                개인 {fmtQty(investorCumulative.individual)}
+                                                개인 {fmtAmt(investorCumulative.individual)}
                                             </span>
                                             <span className={clr(investorCumulative.foreign)}>
-                                                외인 {fmtQty(investorCumulative.foreign)}
+                                                외인 {fmtAmt(investorCumulative.foreign)}
                                             </span>
                                             <span className={clr(investorCumulative.institution)}>
-                                                기관 {fmtQty(investorCumulative.institution)}
+                                                기관 {fmtAmt(investorCumulative.institution)}
                                             </span>
                                         </div>
                                     )}
 
                                     {/* Scrollable list — grid layout */}
-                                    <div className="max-h-[280px] overflow-y-auto overflow-x-hidden text-[11px]">
+                                    <div className="max-h-[280px] overflow-y-auto overflow-x-hidden text-[10px]">
                                         {/* Header */}
-                                        <div className="grid text-slate-500 border-b border-slate-700 pb-0.5 mb-0.5 sticky top-0 bg-slate-800/95 z-10" style={{gridTemplateColumns:'36px 54px 46px 38px 1fr 1fr 1fr'}}>
+                                        <div className="grid text-slate-500 border-b border-slate-700 pb-0.5 mb-0.5 sticky top-0 bg-slate-800/95 z-10" style={{gridTemplateColumns:'32px 48px 50px 48px 1fr 1fr 1fr'}}>
                                             <span>일자</span>
                                             <span className="text-right">종가</span>
                                             <span className="text-right">대비</span>
@@ -581,14 +582,14 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                             const dt = row.date ? `${row.date.slice(4, 6)}/${row.date.slice(6, 8)}` : '';
                                             const vol = row.volume >= 1_000_000 ? `${(row.volume / 1_000_000).toFixed(1)}M` : row.volume >= 1000 ? `${Math.round(row.volume / 1000)}K` : `${row.volume}`;
                                             return (
-                                                <div key={row.date} className="grid border-b border-slate-800/20 hover:bg-slate-700/30 py-0.5" style={{gridTemplateColumns:'36px 54px 46px 38px 1fr 1fr 1fr'}}>
+                                                <div key={row.date} className="grid border-b border-slate-800/20 hover:bg-slate-700/30 py-0.5" style={{gridTemplateColumns:'32px 48px 50px 48px 1fr 1fr 1fr'}}>
                                                     <span className="text-slate-400">{dt}</span>
                                                     <span className="text-right text-slate-300 font-mono">{row.close?.toLocaleString() || '-'}</span>
                                                     <span className={`text-right font-mono ${clr(row.change)}`}>{row.change ? sign(row.change) : '-'}</span>
                                                     <span className="text-right text-slate-500 font-mono">{vol}</span>
-                                                    <span className={`text-right font-mono ${clr(row.individual)}`}>{fmtQty(row.individual)}</span>
-                                                    <span className={`text-right font-mono ${clr(row.foreign)}`}>{fmtQty(row.foreign)}</span>
-                                                    <span className={`text-right font-mono ${clr(row.institution)}`}>{fmtQty(row.institution)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.individual)}`}>{fmtAmt(row.individual)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.foreign)}`}>{fmtAmt(row.foreign)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.institution)}`}>{fmtAmt(row.institution)}</span>
                                                 </div>
                                             );
                                         })}

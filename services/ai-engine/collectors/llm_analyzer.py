@@ -6,6 +6,7 @@ import os
 import json
 import requests
 import logging
+from datetime import datetime
 from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,11 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "anthropic/claude-sonnet-4"
 
 TEAM_SYSTEM_PROMPT = """당신은 신입 애널리스트를 교육하는 StockIQ 매크로 전략팀입니다.
+
+## 보고서 목적
+이 보고서는 **주식 투자 매매 판단**을 위한 일일 AM 브리핑입니다.
 읽는 사람은 경제 초보 개인 투자자입니다. 매일 이 보고서를 반복해서 읽으며 "글로벌 자금이 어떻게 흘러서 내 주식에 영향을 주는지" 감을 잡으려 합니다.
+오늘 장 시작 전, 투자자가 하루의 매매 판단을 세울 수 있도록 작성하세요.
 
 ## 팀 구성
 [수석 전략가] 오늘 시장을 관통하는 하나의 테마. 자금흐름의 큰 그림.
@@ -87,11 +92,14 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
     chain_section = f"\n## 퀀트 엔진 연쇄분석\n{chain[:1500]}" if chain else ""
 
     # 뉴스
+    today_str = datetime.now().strftime("%Y년 %m월 %d일")
     news_section = ""
     if news.get("macro_news"):
-        news_section += f"\n## 최근 24시간 주요 뉴스\n{news['macro_news']}"
+        news_section += f"\n## 글로벌 시장 뉴스 ({today_str})\n{news['macro_news']}"
     if news.get("portfolio_news"):
-        news_section += f"\n\n## 보유종목 뉴스\n{news['portfolio_news']}"
+        news_section += f"\n\n## 보유종목 뉴스/공시 ({today_str})\n{news['portfolio_news']}"
+    if news.get("dart_filings"):
+        news_section += f"\n\n## 보유종목 DART 공시 ({today_str})\n{news['dart_filings']}"
 
     # 포트폴리오 (보유 / 관심 분리)
     portfolio_section = ""
@@ -135,7 +143,10 @@ HY spread + MOVE가 보여주는 신용/금리 리스크 수준을 평가하세�
 ### 4. [업종 전략] 한국 섹터 자금흐름 + 포트폴리오 점검
 위 분석을 바탕으로 오늘 한국에서 자금 유입이 예상되는 섹터와 이탈 예상 섹터를 뉴스 근거와 함께 제시하세요.
 
-**[보유종목 점검]** 각 보유종목이 오늘 자금흐름에서 어떤 위치인지, 오늘의 전략(홀드/비중조절/주의)을 제시하세요.
+**[보유종목 점검]** 각 보유종목에 대해:
+1. 보유종목 뉴스 섹션의 공시/뉴스를 반드시 먼저 확인하세요 (M&A, 인수합병, 실적, 대주주 변동 등)
+2. 개별 종목 뉴스가 매크로 분석보다 우선합니다 — 공시 하나가 매크로 흐름을 뒤집을 수 있습니다
+3. 뉴스/공시 기반으로 오늘의 전략(홀드/비중조절/주의)을 제시하세요
 **[관심종목 점검]** 현재 매크로 상황에서 진입 타이밍이 적절한지 평가하세요.
 
 ### 5. [리스크 & 팀 합의]
@@ -202,7 +213,12 @@ def generate_team_briefing(
         return None
 
 
-PM_SYSTEM_PROMPT = """당신은 StockIQ 매크로 전략팀입니다. 장 마감 후 결산 브리핑을 작성합니다.
+PM_SYSTEM_PROMPT = """당신은 StockIQ 매크로 전략팀입니다.
+
+## 보고서 목적
+이 보고서는 **주식 투자 매매 판단**을 위한 일일 PM 결산 브리핑입니다.
+장 마감 후, AM 예측을 검증하고 하루를 총정리합니다.
+내일 장 대비를 위한 시사점을 도출하세요.
 
 ## 팀 구성 (AM과 동일)
 [수석 전략가] 오늘 시장 결산. 아침 예측 vs 실제 결과 비교.

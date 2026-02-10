@@ -6,6 +6,7 @@ NewsCollector: Perplexity API 기반 시장 뉴스 수집
 import os
 import requests
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
@@ -49,12 +50,15 @@ def _call_perplexity(query: str, system_prompt: str = "") -> Optional[str]:
 
 def collect_macro_news() -> dict:
     """글로벌 매크로 뉴스 수집"""
-    system = """당신은 금융시장 뉴스 수집가입니다.
-최근 24시간 이내 주요 시장 뉴스를 정리하세요.
+    today = datetime.now().strftime("%Y년 %m월 %d일")
+
+    system = f"""당신은 금융시장 뉴스 수집가입니다.
+오늘은 {today}입니다.
+어제~오늘 사이 발생한 주요 시장 뉴스만 정리하세요.
 각 뉴스는 [출처] 제목 — 핵심 영향 형식으로 작성하세요.
 최대 8개, 중요도 순서로."""
 
-    query = """오늘 글로벌 금융시장 주요 뉴스를 알려주세요:
+    query = f"""{today} 기준 글로벌 금융시장 주요 뉴스를 알려주세요:
 1. 미국 증시 (나스닥, S&P500) 움직임과 원인
 2. 달러 인덱스(DXY) 및 원/달러 환율 동향
 3. 유가(WTI) 변동과 원인 (OPEC, 지정학 등)
@@ -76,18 +80,29 @@ def collect_portfolio_news(symbols: List[dict]) -> dict:
 
     names = [s.get("name", s.get("symbol", "")) for s in symbols[:5]]  # 최대 5종목
     names_str = ", ".join(names)
+    today = datetime.now().strftime("%Y년 %m월 %d일")
 
-    system = """당신은 한국 주식 뉴스 전문가입니다.
-각 종목별로 최근 24시간 내 핵심 뉴스 1~2개만 정리하세요.
-[종목명] 뉴스 제목 — 주가 영향 (긍정/부정/중립) 형식으로."""
+    system = f"""당신은 한국 주식 뉴스 전문가입니다.
+오늘은 {today}입니다. 이 정보는 주식 투자 매매 판단에 사용됩니다.
+어제~오늘 핵심 뉴스/공시를 아래 표 형식으로 정리하세요.
 
-    query = f"""다음 종목들의 최신 뉴스를 알려주세요: {names_str}
+| 종목 | 날짜 | 뉴스/공시 | 영향 |
+|------|------|----------|------|
+| 삼성전자 | 02/10 | 자사주 1조원 매입 결정 | 긍정 |
 
-각 종목별로:
-- 실적/공시 관련 뉴스
-- 업종 동향
-- 수급 변화 (외국인/기관 매매)
-- 주가에 영향을 줄 이벤트"""
+규칙:
+- 종목당 최대 2건, 중요도 순
+- 영향: 긍정/부정/중립 중 택1
+- 뉴스가 없는 종목도 "특이사항 없음"으로 포함"""
+
+    query = f"""{today} 기준, 다음 종목들의 최신 뉴스와 공시를 알려주세요: {names_str}
+
+우선순위:
+1. 공시 (M&A, 인수합병, 유상증자, 자사주 매입, 대주주 변동)
+2. 실적 발표 / 어닝 서프라이즈
+3. 업종 정책/규제 변화
+4. 수급 변화 (외국인/기관 대량 매매)
+5. 주가에 영향을 줄 기타 이벤트"""
 
     content, citations = _call_perplexity(query, system)
     return {
