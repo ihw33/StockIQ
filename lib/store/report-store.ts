@@ -20,7 +20,7 @@ export interface AnalysisReport {
 interface ReportStore {
     reports: AnalysisReport[];
     deletedDbIds: number[]; // Track deleted DB IDs to prevent re-adding
-    addReport: (report: Omit<AnalysisReport, 'id'> & { timestamp?: Date }) => string;
+    addReport: (report: Omit<AnalysisReport, 'id' | 'timestamp'> & { timestamp?: Date }) => string;
     getReportsBySymbol: (symbol: string) => AnalysisReport[];
     getReportsBySession: (sessionId: string) => AnalysisReport[];
     getRecentReports: (limit?: number) => AnalysisReport[];
