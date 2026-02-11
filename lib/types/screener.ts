@@ -5,6 +5,7 @@
 export interface ScreenerResult {
     symbol: string;
     name: string;
+    market: string;
     sector: string;
     industry: string;
     market_cap: number;
@@ -13,6 +14,12 @@ export interface ScreenerResult {
     roe?: number;
     eps?: number;
     bps?: number;
+    // 거래 정보
+    cur_price?: number;
+    change?: number;        // 전일대비
+    change_pct?: number;    // 등락률
+    volume?: number;
+    trade_amount?: number;
 }
 
 export interface ScreenerRequest {
