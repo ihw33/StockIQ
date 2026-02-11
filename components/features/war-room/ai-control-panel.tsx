@@ -375,7 +375,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                         )}
                     >
                         {loadingDeep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
-                        심층
+                        종합
                     </button>
                     <button
                         onClick={() => triggerAnalysis('company')}
@@ -429,7 +429,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                 alert.mode === 'algo' ? 'bg-blue-500/10 text-blue-400' :
                                 alert.mode === 'company' ? 'bg-amber-500/10 text-amber-400' : 'bg-purple-500/10 text-purple-400'
                             )}>
-                                {alert.mode === 'algo' ? '알고리즘' : alert.mode === 'company' ? '기업' : '심층'}
+                                {alert.mode === 'algo' ? '알고리즘' : alert.mode === 'company' ? '기업' : '종합'}
                             </span>
                             <span className="text-slate-600 text-[10px] ml-auto shrink-0">
                                 {formatTimeAgo(alert.analyzedAt)}

@@ -42,7 +42,7 @@ useEffect(() => {
 
 분석 버튼:
 - "알고리즘 분석" → `/api/ai/algo-analysis-start`
-- "심층 분석" → `/api/ai/deep-analysis-start`
+- "종합 분석" → `/api/ai/deep-analysis-start`
 - "기업 분석" → `/api/ai/company-analysis-start`
 
 ⚠️ **중요**:
@@ -56,7 +56,7 @@ useEffect(() => {
 필터:
 - `all` - 전체
 - `algo` - 알고리즘만
-- `llm` - 심층 분석만
+- `llm` - 종합 분석만
 - `company` - 기업 분석만
 
 시간 표시: `MM/DD HH:MM` 형식

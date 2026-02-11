@@ -11,7 +11,7 @@ FastAPI 기반 분석 엔진 - 포트 8001
 - `/api/strategy/morning-briefing` - 아침 브리핑
 - `/api/strategy/chart-analysis` - 차트 분석 (algo/llm/company)
 - `/api/strategy/algo-analysis-start` - 알고리즘 분석 (백그라운드)
-- `/api/strategy/deep-analysis-start` - 심층 분석 (백그라운드)
+- `/api/strategy/deep-analysis-start` - 종합 분석 (백그라운드)
 - `/api/strategy/company-analysis-start` - 기업 분석 (백그라운드)
 - `/api/strategy/reports/pending` - 대기 중인 보고서 조회
 
@@ -31,7 +31,7 @@ FastAPI 기반 분석 엔진 - 포트 8001
 
 `analyze(symbol, mode, query, position_info)`:
 - `mode="algo"` - 알고리즘 분석
-- `mode="llm"` - 심층 LLM 분석
+- `mode="llm"` - 종합 LLM 분석
 - `mode="company"` - 기업 펀더멘탈 분석
 
 ### collectors/

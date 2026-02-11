@@ -11,7 +11,7 @@ type FilterMode = 'all' | 'algo' | 'llm' | 'company';
 const FILTER_TABS: { key: FilterMode; label: string }[] = [
     { key: 'all', label: '전체' },
     { key: 'algo', label: '알고리즘' },
-    { key: 'llm', label: '심층' },
+    { key: 'llm', label: '종합' },
     { key: 'company', label: '기업' },
 ];
 
@@ -150,7 +150,7 @@ export function ReportsTab({ initialFilter }: ReportsTabProps = {}) {
 function modeLabel(mode: string): string {
     switch (mode) {
         case 'algo': return '알고리즘 분석';
-        case 'llm': return '심층 분석';
+        case 'llm': return '종합 분석';
         case 'company': return '기업 분석';
         default: return mode;
     }
@@ -159,7 +159,7 @@ function modeLabel(mode: string): string {
 function modeBadge(mode: string): string {
     switch (mode) {
         case 'algo': return '알고';
-        case 'llm': return '심층';
+        case 'llm': return '종합';
         case 'company': return '기업';
         default: return mode;
     }

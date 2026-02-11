@@ -129,7 +129,7 @@ function ReportsContent() {
                                         : 'text-slate-400 hover:text-slate-300'
                                 }`}
                             >
-                                {mode === 'all' ? '전체' : mode === 'algo' ? '알고리즘' : mode === 'llm' ? '심층' : '기업'}
+                                {mode === 'all' ? '전체' : mode === 'algo' ? '알고리즘' : mode === 'llm' ? '종합' : '기업'}
                             </button>
                         ))}
                     </div>
@@ -140,7 +140,7 @@ function ReportsContent() {
                     {displayGroups.length === 0 ? (
                         <div className="p-6 text-center">
                             <p className="text-sm text-slate-500">보고서가 없습니다</p>
-                            <p className="text-xs text-slate-600 mt-1">War Room에서 심층 분석을 실행하세요</p>
+                            <p className="text-xs text-slate-600 mt-1">War Room에서 종합 분석을 실행하세요</p>
                         </div>
                     ) : (
                         <div className="py-2">
@@ -162,7 +162,7 @@ function ReportsContent() {
                                         )}
                                         {group.hasLlm && (
                                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-900/50 text-purple-300">
-                                                심층
+                                                종합
                                             </span>
                                         )}
                                         {group.hasCompany && (
@@ -219,7 +219,7 @@ function ReportsContent() {
                         <div className="mb-6">
                             <div className="flex items-center gap-2 mb-2">
                                 {selectedGroup.hasAlgo && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">알고리즘</Badge>}
-                                {selectedGroup.hasLlm && <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">심층 분석</Badge>}
+                                {selectedGroup.hasLlm && <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">종합 분석</Badge>}
                                 {selectedGroup.hasCompany && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">기업 분석</Badge>}
                             </div>
                             <h1 className="text-2xl font-bold text-gray-900">

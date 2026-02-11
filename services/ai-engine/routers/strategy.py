@@ -32,7 +32,7 @@ async def run_chart_analysis(request: ChartAnalysisRequest):
         strategy = ChartAnalyst()
         result = await strategy.analyze(request.symbol, request.mode or "llm", request.query, request.position_info)
 
-        # LLM 심층분석 성공 시 DB에 자동 저장 (개별 호출 시)
+        # LLM 종합분석 성공 시 DB에 자동 저장 (개별 호출 시)
         if (request.mode or "llm") == "llm" and result.get("status") == "success":
             try:
                 from database import analysis_db
@@ -59,7 +59,7 @@ async def run_chart_analysis(request: ChartAnalysisRequest):
 @router.post("/api/strategy/deep-analysis-start")
 async def start_deep_analysis(request: DeepAnalysisRequest, background_tasks: BackgroundTasks):
     """
-    심층분석을 백그라운드로 시작. 즉시 응답 후 서버에서 algo+LLM 실행 → DB 저장.
+    종합분석을 백그라운드로 시작. 즉시 응답 후 서버에서 algo+LLM 실행 → DB 저장.
     프론트엔드는 /api/reports/pending 폴링으로 완료 감지.
     """
     if not request.symbol:
@@ -108,7 +108,7 @@ async def _run_deep_analysis_bg(symbol: str, position_info: Optional[dict] = Non
             algo_summary = f"⚠️ 알고리즘 분석 실패: {algo_result.get('error', '알 수 없는 오류')}"
             print(f"[종합분석 BG] Algo failed for {symbol}")
 
-        # 2) LLM 심층분석 실행
+        # 2) LLM 종합분석 실행
         print(f"[종합분석 BG] Starting LLM for {stock_name}({symbol})")
         llm_result = await strategy.analyze(symbol, "llm", None, position_info)
 
@@ -124,7 +124,7 @@ async def _run_deep_analysis_bg(symbol: str, position_info: Optional[dict] = Non
 
 ---
 
-## 🤖 AI 심층 분석
+## 🤖 AI 종합 분석
 
 {llm_analysis}
 
