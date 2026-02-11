@@ -108,43 +108,71 @@ def detect_market_stress(df: pd.DataFrame) -> Dict:
 
 def analyze_recent_volatility(df: pd.DataFrame, days: int = 5) -> Dict:
     """
-    Analyze recent N-day price volatility and changes.
-    
+    Analyze recent N-day price volatility, volume, and trading patterns.
+
     Args:
-        df: OHLCV DataFrame
+        df: OHLCV DataFrame (full history for baseline calculation)
         days: Number of recent days to analyze
-        
+
     Returns:
         {
-            'history': List[Dict],  # Daily close, change%, volume ratio
+            'history': List[Dict],  # Daily data with volume, trade amount
             'cumulative_change_pct': float,
             'avg_daily_volatility': float,
-            'volatility_level': 'NORMAL|MEDIUM|HIGH'
+            'volatility_level': 'NORMAL|MEDIUM|HIGH',
+            'volume_level': str,  # Volume level assessment
+            'volume_trend': str,  # Volume trend
+            'avg_trade_amount': float,  # Average trade amount (5 days)
+            'trade_amount_trend': str,  # Trade amount trend
+            'buying_pressure': float  # Estimated buying pressure (0-100, 추정치)
         }
     """
     try:
         if len(df) < days:
             days = len(df)
-        
+
         recent = df.tail(days).copy()
+
+        # Calculate 20-day volume average for baseline (from full df)
+        if len(df) >= 20 and 'volume' in df.columns:
+            vol_20d_avg = df.tail(20)['volume'].mean()
+        else:
+            vol_20d_avg = recent['volume'].mean() if 'volume' in recent.columns else 1
+
+        # Calculate recent 5-day volume average
+        vol_5d_avg = recent['volume'].mean() if 'volume' in recent.columns else 1
+
         history = []
-        
+        up_volume = 0  # Volume on up days
+        down_volume = 0  # Volume on down days
+        trade_amounts = []
+
         for i in range(len(recent)):
             row = recent.iloc[i]
-            
+
             if i == 0:
                 pct_change = 0.0
             else:
                 prev_close = recent.iloc[i-1]['close']
                 pct_change = ((row['close'] - prev_close) / prev_close * 100) if prev_close > 0 else 0.0
-            
-            # Volume ratio
+
+            # Volume metrics
             if 'volume' in recent.columns:
-                vol_avg = recent['volume'].mean()
-                vol_ratio = (row['volume'] / vol_avg) if vol_avg > 0 else 1.0
+                volume = row['volume']
+                vol_ratio_20d = (volume / vol_20d_avg) if vol_20d_avg > 0 else 1.0
+                trade_amount = row['close'] * volume / 1e8  # 억원 단위
+                trade_amounts.append(trade_amount)
+
+                # Accumulate volume by direction for buying pressure
+                if pct_change > 0:
+                    up_volume += volume
+                elif pct_change < 0:
+                    down_volume += volume
             else:
-                vol_ratio = 1.0
-            
+                volume = 0
+                vol_ratio_20d = 1.0
+                trade_amount = 0
+
             # Date formatting
             try:
                 if hasattr(row.name, 'strftime'):
@@ -153,21 +181,23 @@ def analyze_recent_volatility(df: pd.DataFrame, days: int = 5) -> Dict:
                     date_str = f'D-{days-i-1}'
             except:
                 date_str = f'D-{days-i-1}'
-            
+
             history.append({
                 'date': date_str,
                 'close': float(row['close']),
                 'change_pct': float(pct_change),
-                'volume_ratio': float(vol_ratio)
+                'volume': int(volume),
+                'volume_ratio': float(vol_ratio_20d),
+                'trade_amount': float(trade_amount)
             })
-        
+
         # Cumulative change
         cumulative_change = ((recent['close'].iloc[-1] - recent['close'].iloc[0]) / recent['close'].iloc[0] * 100) if recent['close'].iloc[0] > 0 else 0.0
-        
+
         # Average absolute daily change
         changes = [abs(h['change_pct']) for h in history[1:]]  # Skip first day
         avg_abs_change = sum(changes) / len(changes) if changes else 0.0
-        
+
         # Volatility level
         if avg_abs_change > 2.5:
             volatility = 'HIGH'
@@ -175,12 +205,65 @@ def analyze_recent_volatility(df: pd.DataFrame, days: int = 5) -> Dict:
             volatility = 'MEDIUM'
         else:
             volatility = 'NORMAL'
-        
+
+        # Volume level assessment (5-day avg vs 20-day avg)
+        vol_ratio = (vol_5d_avg / vol_20d_avg) if vol_20d_avg > 0 else 1.0
+        if vol_ratio > 1.5:
+            volume_level = '높음'
+        elif vol_ratio > 0.8:
+            volume_level = '보통'
+        else:
+            volume_level = '낮음'
+
+        # Volume trend (first 3 days vs last 3 days)
+        if len(history) >= 3:
+            early_vol = sum(h['volume'] for h in history[:3]) / 3
+            late_vol = sum(h['volume'] for h in history[-3:]) / 3
+            vol_change = ((late_vol - early_vol) / early_vol * 100) if early_vol > 0 else 0
+            if vol_change > 20:
+                volume_trend = '증가 중'
+            elif vol_change < -20:
+                volume_trend = '감소 중'
+            else:
+                volume_trend = '보합'
+        else:
+            volume_trend = '보합'
+
+        # Average trade amount
+        avg_trade_amount = sum(trade_amounts) / len(trade_amounts) if trade_amounts else 0
+
+        # Trade amount trend
+        if len(trade_amounts) >= 3:
+            early_amt = sum(trade_amounts[:3]) / 3
+            late_amt = sum(trade_amounts[-3:]) / 3
+            amt_change = ((late_amt - early_amt) / early_amt * 100) if early_amt > 0 else 0
+            if amt_change > 20:
+                trade_amount_trend = '증가 중'
+            elif amt_change < -20:
+                trade_amount_trend = '감소 중'
+            else:
+                trade_amount_trend = '보합'
+        else:
+            trade_amount_trend = '보합'
+
+        # Buying pressure (체결강도 추정)
+        # 상승일 거래량 / (상승일 + 하락일 거래량) * 100
+        total_directional_volume = up_volume + down_volume
+        if total_directional_volume > 0:
+            buying_pressure = (up_volume / total_directional_volume) * 100
+        else:
+            buying_pressure = 50.0  # Neutral
+
         return {
             'history': history,
             'cumulative_change_pct': float(cumulative_change),
             'avg_daily_volatility': float(avg_abs_change),
-            'volatility_level': volatility
+            'volatility_level': volatility,
+            'volume_level': volume_level,
+            'volume_trend': volume_trend,
+            'avg_trade_amount': float(avg_trade_amount),
+            'trade_amount_trend': trade_amount_trend,
+            'buying_pressure': float(buying_pressure)
         }
         
     except Exception as e:

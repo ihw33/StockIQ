@@ -308,7 +308,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
         };
         const labels: Record<string, string> = {
             algo: '알고리즘 분석',
-            deep: '심층 분석',
+            deep: '종합 분석',
             company: '기업 분석',
         };
         const setLoading = type === 'algo' ? setLoadingAlgo : type === 'deep' ? setLoadingDeep : setLoadingCompany;

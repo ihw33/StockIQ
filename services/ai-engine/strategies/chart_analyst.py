@@ -437,11 +437,11 @@ AI가 이 결론을 내린 구체적인 근거입니다.
 
 """
         
-        # Build recent volatility table
-        volatility_section = f"""## 📊 최근 5일 변동 내역
+        # Build recent volatility table with volume/trade amount
+        volatility_section = f"""## 📊 최근 5일 거래 현황
 
-| 날짜 | 종가 | 변동 | 거래량 | 상태 |
-|------|------|------|--------|------|
+| 날짜 | 종가 | 변동 | 거래량 | 거래대금 | 상태 |
+|------|------|------|----------|----------|------|
 """
         for h in recent_volatility['history']:
             if h['change_pct'] > 3:
@@ -454,14 +454,40 @@ AI가 이 결론을 내린 구체적인 근거입니다.
                 emoji = '🔴'
             else:
                 emoji = '🔴 급락'
+
             vol_emoji = '📈' if h['volume_ratio'] > 1.5 else '📊' if h['volume_ratio'] > 0.7 else '📉'
-            volatility_section += f"| {h['date']} | {h['close']:,.0f}원 | {h['change_pct']:+.1f}% | {vol_emoji} {h['volume_ratio']:.1f}x | {emoji} |\n"
-        
+            volume_str = f"{h['volume']/1e8:.1f}억주" if h['volume'] >= 1e8 else f"{h['volume']/1e4:.0f}만주"
+            trade_amt_str = f"{h['trade_amount']/1e4:.0f}조원" if h['trade_amount'] >= 1e4 else f"{h['trade_amount']:.0f}억원"
+
+            volatility_section += f"| {h['date']} | {h['close']:,.0f}원 | {h['change_pct']:+.1f}% | {vol_emoji} {volume_str} ({h['volume_ratio']:.1f}배) | 💰 {trade_amt_str} | {emoji} |\n"
+
+        # Volume and trade amount summary
+        vol_level_emoji = {'높음': '🔥', '보통': '📊', '낮음': '❄️'}.get(recent_volatility['volume_level'], '📊')
+        vol_trend_emoji = {'증가 중': '↗️', '감소 중': '↘️', '보합': '→'}.get(recent_volatility['volume_trend'], '→')
+        amt_trend_emoji = {'증가 중': '↗️', '감소 중': '↘️', '보합': '→'}.get(recent_volatility['trade_amount_trend'], '→')
+
+        # Buying pressure assessment
+        bp = recent_volatility['buying_pressure']
+        if bp >= 65:
+            bp_status = '🟢 강한 매수세'
+        elif bp >= 55:
+            bp_status = '🟢 매수 우위'
+        elif bp >= 45:
+            bp_status = '⚪ 중립'
+        elif bp >= 35:
+            bp_status = '🔴 매도 우위'
+        else:
+            bp_status = '🔴 강한 매도세'
+
         volatility_warning = ""
         if recent_volatility['volatility_level'] == 'HIGH':
-            volatility_warning = " ⚠️ **변동성 확장 구간** (눌림목이 아닐 수 있음)"
-        volatility_section += f"""\n**5일 누적 변동: {recent_volatility['cumulative_change_pct']:+.1f}%** | **평균 일간 변동: {recent_volatility['avg_daily_volatility']:.1f}%**  
-**변동성 수준: {recent_volatility['volatility_level']}**{volatility_warning}
+            volatility_warning = "\n⚠️ **변동성 확장 구간** (눌림목이 아닐 수 있음)"
+
+        volatility_section += f"""\n**📈 5일 누적 변동: {recent_volatility['cumulative_change_pct']:+.1f}%** | **평균 일간 변동: {recent_volatility['avg_daily_volatility']:.1f}%** | **변동성: {recent_volatility['volatility_level']}**{volatility_warning}
+
+**{vol_level_emoji} 거래량 수준: {recent_volatility['volume_level']}** (20일 평균 대비) | **{vol_trend_emoji} 추이: {recent_volatility['volume_trend']}**
+**💰 평균 거래대금: {recent_volatility['avg_trade_amount']:.0f}억원** | **{amt_trend_emoji} 추이: {recent_volatility['trade_amount_trend']}**
+**⚖️ 체결강도 추정: {bp:.0f}점** ({bp_status}) _※ 상승일/하락일 거래량 기준 추정치_
 
 ---
 
