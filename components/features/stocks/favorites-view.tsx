@@ -11,7 +11,7 @@ import { Star, Download, FolderInput, Briefcase } from 'lucide-react'
 export function FavoritesView() {
   const router = useRouter()
   const { getFavorites, isFavorite, toggleFavorite } = useFavoritesStore()
-  const { addToWatchlist, removeFromWatchlist, getItemGroup, changeGroup, groups } = useWatchlist()
+  const { addToWatchlist, removeFromWatchlist, getItemGroup, changeGroup, groups, isInWatchlist } = useWatchlist()
   const { addPosition } = usePortfolioStore()
   const favoriteCodes = getFavorites()
 
@@ -88,8 +88,14 @@ export function FavoritesView() {
 
   const handleGroupChange = (e: React.MouseEvent, stock: Stock, newGroup: number) => {
     e.stopPropagation()
-    // 관심종목 그룹 변경
-    changeGroup(stock.code, newGroup)
+
+    // watchlist에 없으면 먼저 추가
+    if (!isInWatchlist(stock.code)) {
+      addToWatchlist(stock.code, stock.name, newGroup)
+    } else {
+      // 이미 있으면 그룹만 변경
+      changeGroup(stock.code, newGroup)
+    }
   }
 
   const handleAddToPortfolio = (e: React.MouseEvent, stock: Stock) => {
@@ -275,8 +281,8 @@ export function FavoritesView() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {/* 업종 태그 */}
-                    {stock.industries.map((ind, idx) => (
+                    {/* 업종 태그 (중복 제거) */}
+                    {[...new Set(stock.industries)].map((ind, idx) => (
                       <span
                         key={`ind-${idx}`}
                         className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded"
@@ -284,8 +290,8 @@ export function FavoritesView() {
                         {ind}
                       </span>
                     ))}
-                    {/* 그룹 태그 */}
-                    {stock.groups.map((grp, idx) => (
+                    {/* 그룹 태그 (중복 제거) */}
+                    {[...new Set(stock.groups)].map((grp, idx) => (
                       <span
                         key={`grp-${idx}`}
                         className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded"
@@ -293,8 +299,8 @@ export function FavoritesView() {
                         {grp}
                       </span>
                     ))}
-                    {/* 테마 태그 (상위 3개) */}
-                    {stock.themes.slice(0, 3).map((theme, idx) => (
+                    {/* 테마 태그 (중복 제거 후 상위 3개) */}
+                    {[...new Set(stock.themes)].slice(0, 3).map((theme, idx) => (
                       <span
                         key={`theme-${idx}`}
                         className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded"
@@ -303,9 +309,9 @@ export function FavoritesView() {
                       </span>
                     ))}
                     {/* 더보기 표시 */}
-                    {stock.themes.length > 3 && (
+                    {[...new Set(stock.themes)].length > 3 && (
                       <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-                        +{stock.themes.length - 3}
+                        +{[...new Set(stock.themes)].length - 3}
                       </span>
                     )}
                   </div>

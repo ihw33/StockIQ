@@ -131,8 +131,8 @@ export function StockListTable({ stocks }: StockListTableProps) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {/* 업종 태그 */}
-                        {stock.industries.slice(0, 2).map((ind, idx) => (
+                        {/* 업종 태그 (중복 제거) */}
+                        {[...new Set(stock.industries)].slice(0, 2).map((ind, idx) => (
                           <span
                             key={`ind-${idx}`}
                             className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded"
@@ -140,8 +140,8 @@ export function StockListTable({ stocks }: StockListTableProps) {
                             {ind}
                           </span>
                         ))}
-                        {/* 그룹 태그 */}
-                        {stock.groups.slice(0, 1).map((grp, idx) => (
+                        {/* 그룹 태그 (중복 제거) */}
+                        {[...new Set(stock.groups)].slice(0, 1).map((grp, idx) => (
                           <span
                             key={`grp-${idx}`}
                             className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded"
@@ -149,8 +149,8 @@ export function StockListTable({ stocks }: StockListTableProps) {
                             {grp}
                           </span>
                         ))}
-                        {/* 테마 태그 (상위 2개) */}
-                        {stock.themes.slice(0, 2).map((theme, idx) => (
+                        {/* 테마 태그 (중복 제거 후 상위 2개) */}
+                        {[...new Set(stock.themes)].slice(0, 2).map((theme, idx) => (
                           <span
                             key={`theme-${idx}`}
                             className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded"
@@ -159,9 +159,9 @@ export function StockListTable({ stocks }: StockListTableProps) {
                           </span>
                         ))}
                         {/* 더보기 표시 */}
-                        {stock.themes.length > 2 && (
+                        {[...new Set(stock.themes)].length > 2 && (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-                            +{stock.themes.length - 2}
+                            +{[...new Set(stock.themes)].length - 2}
                           </span>
                         )}
                       </div>
