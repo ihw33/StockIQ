@@ -37,14 +37,24 @@ export default function StocksBrowsePage() {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold">종목 탐색</h1>
 
-            <button
-              onClick={handleFetchSectors}
-              disabled={fetching}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Download className={`w-4 h-4 ${fetching ? 'animate-bounce' : ''}`} />
-              <span>{fetching ? '크롤링 중...' : '섹터 데이터 가져오기'}</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.location.href = '/sectors/trends'}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg shadow-md transition-all"
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>섹터 동향</span>
+              </button>
+
+              <button
+                onClick={handleFetchSectors}
+                disabled={fetching}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className={`w-4 h-4 ${fetching ? 'animate-bounce' : ''}`} />
+                <span>{fetching ? '크롤링 중...' : '섹터 데이터 가져오기'}</span>
+              </button>
+            </div>
           </div>
 
           {/* 탭 */}
