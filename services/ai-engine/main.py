@@ -16,7 +16,7 @@ env_path = os.path.join(os.path.dirname(__file__), '../../.env.local')
 load_dotenv(env_path)
 
 # Import routers
-from routers import strategy, reports, market, macro, screener, portfolio, alpha_hr
+from routers import strategy, reports, market, macro, screener, portfolio, alpha_hr, stocks, sectors
 
 # Import for scheduler
 from models.requests import MacroCollectRequest
@@ -50,6 +50,8 @@ app.include_router(macro.router, tags=["macro"])
 app.include_router(screener.router, tags=["screener"])
 app.include_router(portfolio.router, tags=["portfolio"])
 app.include_router(alpha_hr.router, tags=["alpha-hr"])
+app.include_router(stocks.router, tags=["stocks"])
+app.include_router(sectors.router, tags=["sectors"])
 
 # ==================== Macro Scheduler ====================
 
@@ -142,7 +144,10 @@ async def _macro_scheduler():
     print("[Macro Scheduler] 스케줄러 종료")
 
 @app.on_event("startup")
-async def start_macro_scheduler():
+async def startup_event():
+    # 종목 데이터 로드
+    stocks.load_stock_data()
+    # 매크로 스케줄러 시작
     asyncio.create_task(_macro_scheduler())
 
 @app.on_event("shutdown")
