@@ -108,15 +108,24 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
         result["economic_calendar"] = calendar_data
 
         # 6. 뉴스 수집 + LLM 브리핑 (모드별 분기)
-        mode = request.mode or "am"
+        mode = request.mode
+        if not mode:
+            # 현재 시간에 따라 자동 선택
+            now = dt_datetime.now(pytz.timezone('Asia/Seoul'))
+            mode = "pm" if now.hour >= 15 else "am"  # 오후 3시 이후는 PM
+
         news_data = {}
         llm_analysis = None
         llm_analysis_pm = None
         collected_at_am = None
         collected_at_pm = None
         try:
-            news_data = collect_all_news(portfolio_symbols if portfolio_symbols else None)
+            # AM 브리핑은 실시간 컨텍스트 포함
+            include_realtime = (mode == "am")
+            news_data = collect_all_news(portfolio_symbols if portfolio_symbols else None, include_realtime=include_realtime)
             logger.info(f"[Macro] News collected: {len(news_data.get('macro_news', ''))} chars")
+            if include_realtime and news_data.get("realtime_context"):
+                logger.info(f"[Macro] Realtime context: {len(news_data.get('realtime_context', ''))} chars")
 
             # DART 공시 수집 (보유종목)
             try:
@@ -128,8 +137,20 @@ async def collect_macro_data(request: MacroCollectRequest = MacroCollectRequest(
                 logger.warning(f"[Macro] DART error (non-fatal): {dart_err}")
 
             if mode == "am" and news_data.get("macro_news"):
-                # AM 예측 브리핑
-                llm_analysis = generate_team_briefing(result, news_data, portfolio_symbols if portfolio_symbols else None)
+                # AM 예측 브리핑: 전날 PM 결산 조회
+                yesterday_pm = None
+                try:
+                    async with analysis_db.pool.acquire() as conn:
+                        pm_row = await conn.fetchrow(
+                            "SELECT llm_analysis_pm FROM macro_daily WHERE date = CURRENT_DATE - INTERVAL '1 day'"
+                        )
+                    if pm_row and pm_row["llm_analysis_pm"]:
+                        yesterday_pm = pm_row["llm_analysis_pm"]
+                        logger.info(f"[Macro] Yesterday PM briefing loaded: {len(yesterday_pm)} chars")
+                except Exception as e:
+                    logger.warning(f"[Macro] Failed to load yesterday PM briefing: {e}")
+
+                llm_analysis = generate_team_briefing(result, news_data, portfolio_symbols if portfolio_symbols else None, yesterday_pm)
                 collected_at_am = dt_datetime.now(pytz.timezone('Asia/Seoul'))
                 logger.info(f"[Macro] AM briefing: {len(llm_analysis or '')} chars")
             elif mode == "pm" and news_data.get("macro_news"):

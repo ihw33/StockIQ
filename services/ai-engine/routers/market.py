@@ -128,7 +128,7 @@ async def get_company_fundamentals(symbol: str):
     """
     try:
         from database import analysis_db
-        from collectors.dart_collector import get_company_overview
+        from collectors.dart_collector import get_company_overview, get_financial_statement
 
         # Ensure DB is connected
         await analysis_db.connect()
@@ -143,6 +143,9 @@ async def get_company_fundamentals(symbol: str):
             # Always fetch extended data from Kiwoom for full info
             kiwoom = KiwoomCollector()
             ext_data = kiwoom.get_company_info(symbol)
+
+            # Fetch DART financial statement (quarterly)
+            dart_financials = get_financial_statement(symbol)
 
             if existing:
                 base = {
@@ -159,9 +162,17 @@ async def get_company_fundamentals(symbol: str):
                 if ext_data:
                     for k in ['ev', 'stk_nm', 'settle_month', 'listed_shares', 'credit_ratio',
                               'year_high', 'year_low', 'high_250', 'low_250', 'foreign_ratio',
-                              'sales', 'operating_profit', 'net_income', 'dividend_rate', 'market_cap']:
+                              'net_income', 'dividend_rate', 'market_cap']:
                         if ext_data.get(k) is not None:
                             base[k] = ext_data[k]
+
+                # Merge DART financial data (quarterly, more recent)
+                if dart_financials:
+                    base["sales"] = dart_financials.get('revenue', 0) // 100000000  # 원 → 억원
+                    base["operating_profit"] = dart_financials.get('operating_profit', 0) // 100000000  # 원 → 억원
+                    base["operating_profit_growth"] = dart_financials.get('operating_profit_growth')
+                    base["fiscal_period"] = f"{dart_financials.get('year', '')} {dart_financials.get('quarter', '')}".strip()
+
                 # Merge DART company overview
                 dart_info = get_company_overview(symbol)
                 if dart_info:
@@ -197,37 +208,50 @@ async def get_company_fundamentals(symbol: str):
                 data.get('market_cap')
             )
 
+        # Build result with DART financial data
+        result_data = {
+            "symbol": symbol,
+            "per": data.get('per'),
+            "pbr": data.get('pbr'),
+            "roe": data.get('roe'),
+            "eps": data.get('eps'),
+            "bps": data.get('bps'),
+            "ev": data.get('ev'),
+            "market_cap": data.get('market_cap'),
+            "stk_nm": data.get('stk_nm', ''),
+            "settle_month": data.get('settle_month', ''),
+            "listed_shares": data.get('listed_shares'),
+            "credit_ratio": data.get('credit_ratio'),
+            "year_high": data.get('year_high'),
+            "year_low": data.get('year_low'),
+            "high_250": data.get('high_250'),
+            "low_250": data.get('low_250'),
+            "foreign_ratio": data.get('foreign_ratio'),
+            "net_income": data.get('net_income'),
+            "dividend_rate": data.get('dividend_rate'),
+        }
+
+        # Add DART financial data (quarterly, more recent)
+        if dart_financials:
+            result_data["sales"] = dart_financials.get('revenue', 0) // 100000000  # 원 → 억원
+            result_data["operating_profit"] = dart_financials.get('operating_profit', 0) // 100000000  # 원 → 억원
+            result_data["operating_profit_growth"] = dart_financials.get('operating_profit_growth')
+            result_data["fiscal_period"] = f"{dart_financials.get('year', '')} {dart_financials.get('quarter', '')}".strip()
+        else:
+            # Fallback to Kiwoom data if DART not available
+            result_data["sales"] = data.get('sales')
+            result_data["operating_profit"] = data.get('operating_profit')
+
+        # Add DART company overview
+        dart_info = get_company_overview(symbol)
+        if dart_info:
+            result_data["dart_overview"] = dart_info
+
         result = {
             "status": "success",
             "source": "api",
-            "data": {
-                "symbol": symbol,
-                "per": data.get('per'),
-                "pbr": data.get('pbr'),
-                "roe": data.get('roe'),
-                "eps": data.get('eps'),
-                "bps": data.get('bps'),
-                "ev": data.get('ev'),
-                "market_cap": data.get('market_cap'),
-                "stk_nm": data.get('stk_nm', ''),
-                "settle_month": data.get('settle_month', ''),
-                "listed_shares": data.get('listed_shares'),
-                "credit_ratio": data.get('credit_ratio'),
-                "year_high": data.get('year_high'),
-                "year_low": data.get('year_low'),
-                "high_250": data.get('high_250'),
-                "low_250": data.get('low_250'),
-                "foreign_ratio": data.get('foreign_ratio'),
-                "sales": data.get('sales'),
-                "operating_profit": data.get('operating_profit'),
-                "net_income": data.get('net_income'),
-                "dividend_rate": data.get('dividend_rate'),
-            }
+            "data": result_data
         }
-        # Merge DART company overview
-        dart_info = get_company_overview(symbol)
-        if dart_info:
-            result["data"]["dart_overview"] = dart_info
         return result
     except HTTPException:
         raise

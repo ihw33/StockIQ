@@ -1,0 +1,292 @@
+KOREAN EARNINGS CALENDAR RESEARCH - EXECUTIVE SUMMARY
+======================================================
+Date: 2026-02-08
+Project: StockIQ (Issue #2 - Finance Calendar)
+
+TLDR: No free official API. earnings.kr website is best source (requires web scraping).
+
+
+KEY FINDINGS BY SOURCE
+======================
+
+1. KRX (Korea Exchange) - Official Market
+   ❌ NO earnings calendar API
+   Status: Not provided by exchange
+
+2. DART (Korea's SEC Equivalent) - Official Filings
+   ✅ API available (free, registration required)
+   ❌ ONLY past filings (earnings dates visible only after announcement)
+   Use case: Historical validation only
+   Website: https://opendart.fss.or.kr
+   Library: OpenDartReader (Python)
+
+3. Naver Finance
+   ❌ No earnings calendar API
+   Website: https://finance.naver.com
+   Use case: Web scraping if needed
+
+4. pykrx (Python library - project already uses it)
+   ❌ NO earnings calendar support
+   Status: Not implemented
+
+5. FinanceDataReader
+   ❌ NO earnings calendar support
+
+6. Finnhub API (US-focused, project already uses for S&P500)
+   ❓ UNKNOWN Korean .KS stock coverage
+   Status: Needs testing
+   Action: Test with Samsung (005930.KS)
+   If works: Use for unified earnings calendar
+   If fails: Use web scraping option
+
+7. earnings.kr ⭐⭐⭐⭐⭐ BEST SOURCE
+   ✅ Upcoming earnings calendar for Korean stocks
+   ✅ High data quality
+   ❌ NO official API (requires web scraping)
+   Website: https://earnings.kr/calendar
+   Use case: PRIMARY source for Korean earnings
+
+8. Investing.com
+   ✅ Includes Korean earnings
+   ❌ NO official API
+   Website: https://www.investing.com/earnings-calendar/
+   Use case: Secondary scraping target
+
+9. TradingView
+   ✅ Korean earnings calendar
+   ❌ NO official API
+   Website: https://www.tradingview.com/markets/stocks-korea/earnings/
+   Use case: Tertiary scraping target
+
+
+RECOMMENDED APPROACH
+====================
+
+OPTION A: Quick Fix (30 min)
+  → Test if Finnhub supports Korean .KS tickers
+  → If yes: Extend current Finnhub earnings collector
+  → If no: Use Option B
+
+OPTION B: Production Solution (2-3 hours)
+  → Web scrape earnings.kr using Playwright/BeautifulSoup
+  → Create korean_earnings_collector.py
+  → Integrate with economic calendar
+  BEST DATA QUALITY, requires maintenance
+
+OPTION C: Hybrid (Advanced)
+  → Combine earnings.kr (upcoming) + DART API (validation)
+  → DART for historical accuracy checks
+  → earnings.kr for schedule predictions
+
+
+COMPARISON TABLE
+================
+
+Source           | Upcoming | API | Free | Quality | Implementation
+-----------------|----------|-----|------|---------|----------------
+KRX              | ❌       | ❌  | ❌   | N/A     | Not viable
+DART             | ❌       | ✅  | ✅   | ⭐⭐⭐⭐⭐ | Validation only
+Naver Finance    | ⚠️       | ❌  | ✅   | ⭐⭐⭐⭐ | Web scraping
+pykrx            | ❌       | N/A | ✅   | N/A     | No earnings support
+FinanceDataReader| ❌       | N/A | ✅   | N/A     | No earnings support
+Finnhub          | ⚠️       | ✅  | ✅   | ⭐⭐⭐ | Test needed
+earnings.kr      | ✅       | ❌  | ✅   | ⭐⭐⭐⭐⭐ | Web scraping (BEST)
+Investing.com    | ✅       | ❌  | ✅   | ⭐⭐⭐⭐ | Web scraping
+TradingView      | ✅       | ❌  | ✅   | ⭐⭐⭐⭐ | Web scraping
+
+
+TECHNICAL DETAILS
+=================
+
+DART OpenAPI:
+  - Endpoint: https://opendart.fss.or.kr/api/
+  - Key: Free registration required
+  - Rate: Generous (good for free tier)
+  - Data: Company filings, financial statements
+  - Limitation: No future earnings schedule
+
+OpenDartReader Library (Python):
+  pip install OpenDartReader
+  Github: https://github.com/FinanceData/OpenDartReader
+
+Finnhub Earnings API:
+  - Endpoint: https://finnhub.io/api/v1/calendar/earnings
+  - Key: Free tier available
+  - Parameters: from, to, token
+  - Currently used by StockIQ for S&P500
+  - File: services/ai-engine/collectors/economic_calendar_collector.py
+
+earnings.kr:
+  - Website: https://earnings.kr/calendar
+  - Content: AJAX/JavaScript rendered
+  - Scraping tool: Playwright or Selenium
+  - Parsing tool: BeautifulSoup
+  - No rate limiting (check ToS)
+
+
+FILES TO CREATE/MODIFY
+======================
+
+New:
+  1. services/ai-engine/collectors/korean_earnings_collector.py
+     - scrape_earnings_kr(days: int) → List[Dict]
+     - parse_earnings_kr_html(html: str) → List[Dict]
+
+Modified:
+  1. services/ai-engine/collectors/economic_calendar_collector.py
+     - Add: import korean_earnings_collector
+     - Update: collect_all_calendar() to include korean_earnings
+
+  2. app/api/macro/route.ts (optional)
+     - Add Korean earnings endpoint
+
+
+TESTING STEPS
+=============
+
+1. Test Finnhub with Korean symbols:
+   - Create: services/ai-engine/test_finnhub_korean.py
+   - Test symbols: 005930.KS (Samsung), 000660.KS (SK Hynix)
+   - If results found: Use Option C
+   - If empty: Proceed to earnings.kr scraping
+
+2. If scraping earnings.kr:
+   - Inspect earnings.kr DOM structure
+   - Identify CSS selectors for:
+     * Date field
+     * Symbol/code field
+     * Company name field
+     * Market (KOSPI/KOSDAQ) field
+   - Test parser on sample HTML
+   - Validate against known earnings dates
+
+3. Integration test:
+   - Call /api/calendar endpoint
+   - Verify Korean earnings appear alongside US earnings
+   - Check data quality (dates, symbols, names)
+
+
+CURRENT PROJECT CONTEXT
+=======================
+
+StockIQ already has:
+  ✅ Finnhub earnings for S&P500 (works great)
+  ✅ Economic calendar from ForexFactory
+  ✅ macro_dashboard.tsx displays these calendars
+  ❌ NO Korean earnings calendar yet
+
+Adding Korean earnings will complete:
+  - Issue #2 (Finance Calendar)
+  - Enable Asia-Pacific macro analysis
+  - Support Korean stock monitoring
+
+
+NEXT ACTIONS
+============
+
+Immediate (5 min):
+  [ ] Decide: Option A (test), B (scrape), or C (hybrid)?
+
+Short term (1 hour):
+  [ ] If Option A: Run Finnhub test
+  [ ] If Option B: Inspect earnings.kr DOM
+  [ ] If Option C: Plan integration
+
+Medium term (2-3 hours):
+  [ ] Implement chosen solution
+  [ ] Test with real data
+  [ ] Integrate with macro dashboard
+
+Stretch (optional):
+  [ ] Add DART validation layer
+  [ ] Build earnings prediction model
+  [ ] PR to pykrx for earnings support
+
+
+RESOURCES
+=========
+
+Full research document:
+  /Users/m4_macbook/Projects/Stockiq/docs/KOREAN_EARNINGS_CALENDAR_RESEARCH.md
+
+Implementation guide:
+  /Users/m4_macbook/Projects/Stockiq/docs/EARNINGS_CALENDAR_IMPLEMENTATION_GUIDE.md
+
+Official links:
+  - OpenDART: https://opendart.fss.or.kr
+  - Finnhub: https://finnhub.io/docs/api
+  - earnings.kr: https://earnings.kr
+  - pykrx: https://github.com/sharebook-kr/pykrx
+
+API Keys (check .env.local):
+  - FINNHUB_API_KEY: ✓ Already configured
+  - DART_API_KEY: ✓ If planning to use OpenDART
+
+
+DECISION MATRIX
+===============
+
+Choose Option A if:
+  - Time-constrained
+  - Want API solution (no scraping)
+  - S&P500 approach working well
+
+Choose Option B if:
+  - Need best Korean earnings data quality
+  - OK with web scraping maintenance
+  - Want comprehensive Korean coverage
+
+Choose Option C if:
+  - Want hybrid approach
+  - Have time for implementation
+  - Need validation against DART
+
+
+COST ANALYSIS
+=============
+
+Option A (Finnhub test):
+  Time: 5 minutes
+  Cost: Free
+  Risk: Low (just testing)
+  Maintenance: None (if works)
+
+Option B (earnings.kr scraping):
+  Time: 2-3 hours
+  Cost: Free (web scraping)
+  Risk: Medium (site changes break it)
+  Maintenance: Moderate (update selectors if needed)
+
+Option C (Hybrid):
+  Time: 3-4 hours
+  Cost: Free (both APIs free)
+  Risk: Medium (site changes + API limits)
+  Maintenance: Moderate
+
+Recommendation:
+  Start with Option A (quick test)
+  Then do Option B if A fails
+  Consider Option C as enhancement
+
+
+CONCLUSION
+==========
+
+BEST SOURCE: earnings.kr (requires web scraping)
+- Most comprehensive Korean earnings calendar
+- Highest data quality
+- No official API
+
+BEST API: Finnhub (needs testing for Korean stocks)
+- Already integrated with project
+- Clean API design
+- Unknown Korean coverage
+
+FALLBACK: DART (validation & historical data)
+- Official source
+- Free API available
+- Only past earnings, not future schedules
+
+==================================================
+Research completed: 2026-02-08
+Questions? See full documentation

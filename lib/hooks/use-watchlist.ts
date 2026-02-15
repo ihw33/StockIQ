@@ -17,6 +17,8 @@ export const WATCHLIST_GROUPS = [
 
 const WATCHLIST_STORAGE_KEY = 'stockiq-watchlist-v2';
 const DEFAULT_WATCHLIST: WatchlistItem[] = [
+    { symbol: '0001', name: '코스피', addedAt: Date.now(), group: 0 },
+    { symbol: '101', name: '코스닥', addedAt: Date.now(), group: 0 },
     { symbol: '005930', name: '삼성전자', addedAt: Date.now(), group: 0 },
     { symbol: '000660', name: 'SK하이닉스', addedAt: Date.now(), group: 0 },
     { symbol: '035420', name: 'NAVER', addedAt: Date.now(), group: 0 },

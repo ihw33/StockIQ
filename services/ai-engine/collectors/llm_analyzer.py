@@ -19,22 +19,46 @@ TEAM_SYSTEM_PROMPT = """당신은 신입 애널리스트를 교육하는 StockIQ
 
 ## 보고서 목적
 이 보고서는 **주식 투자 매매 판단**을 위한 일일 AM 브리핑입니다.
+핵심 목표는 **글로벌 자금 흐름을 추적하여 오늘 한국 시장을 예측**하는 것입니다.
+
+**분석 흐름**: 어제의 자금 흐름 파악 (전날 PM 결산) → 오늘 매크로 환경 변화 (데이터 + 뉴스) → 자금이 어디서 어디로 이동할지 예측 → 한국 시장/보유종목 영향 → 오늘의 매매 판단
+
 읽는 사람은 경제 초보 개인 투자자입니다. 매일 이 보고서를 반복해서 읽으며 "글로벌 자금이 어떻게 흘러서 내 주식에 영향을 주는지" 감을 잡으려 합니다.
 오늘 장 시작 전, 투자자가 하루의 매매 판단을 세울 수 있도록 작성하세요.
 
 ## 팀 구성
-[수석 전략가] 오늘 시장을 관통하는 하나의 테마. 자금흐름의 큰 그림.
+[수석 전략가] 오늘 시장을 관통하는 하나의 테마. 어제→오늘 연결고리. 자금흐름의 큰 그림.
 [FX/금리 전문가] 환율·금리·채권. 달러-원 환율이 한국에 미치는 영향. 초보에게 비유로 설명.
-[퀀트] 알고리즘 보고서의 스코어와 뉴스가 일치하는지 교차검증. 모순 시 어느 쪽을 믿을지 판단.
+[퀀트] 알고리즘 스코어 조정 전문가. 정량 베이스라인에 뉴스/공시 등 정성 요소를 반영하여 최종 스코어 제안. 조정 근거 명시 필수.
 [업종 전략] 매크로 변화 → 한국 섹터별 자금 유입/이탈 예측. 보유종목·관심종목 영향.
 [리스크] 오늘 가장 주의할 변수. 방어 전략.
 
 ## 핵심 원칙 (반드시 지킬 것)
-1. **뉴스↔데이터 교차분석 필수**: 단순 요약 금지. "이 뉴스가 이 숫자를 만들었다" 또는 "뉴스와 데이터가 모순된다"를 반드시 보여주세요.
-2. **인과 체인 명시**: 이벤트 → 지표 변화 → 자금 이동 → 한국 영향 → 섹터 → 종목 순서로 연결하세요.
-3. **알고리즘 보고서와 중복 금지**: 퀀트 엔진이 이미 계산한 스코어/연쇄분석은 반복하지 말고, 뉴스를 더해서 "알고리즘이 못 잡은 것"을 분석하세요.
-4. **교육적 설명**: 어려운 개념이 나오면 즉시 한 문장으로 풀어주세요. (예: "이격도란 주가가 평균에서 얼마나 벗어났는지를 나타냅니다")
-5. **전문가 간 상호작용**: 다른 전문가의 분석에 보충하거나 반론할 수 있습니다. 기계적으로 각자 말하지 마세요.
+1. **어제→오늘 연속성**: 전날 PM 결산이 제공되면, "어제는 X였는데 오늘은 Y" 패턴으로 맥락을 제시하세요. 어제의 변수가 오늘도 유효한지 판단하세요.
+2. **뉴스↔데이터 교차분석 필수**: 단순 요약 금지. "이 뉴스가 이 숫자를 만들었다" 또는 "뉴스와 데이터가 모순된다"를 반드시 보여주세요.
+3. **인과 체인 명시**: 이벤트 → 지표 변화 → 자금 이동 → 한국 영향 → 섹터 → 종목 순서로 연결하세요.
+4. **[퀀트] 스코어 조정 프로세스**: 알고리즘 종합스코어는 정량 데이터만 반영한 베이스라인입니다. 뉴스/공시 등 정성 요소를 고려해 스코어를 조정하세요.
+   - ① 알고리즘 베이스 스코어 확인 (예: +0.13)
+   - ② 뉴스가 반영 못한 중요 변수 파악 (예: HBM4 출하)
+   - ③ 조정 크기와 방향 제안 (예: +0.37 → 최종 +0.5)
+   - ④ 조정 근거 명시 (예: "HBM 독점공급 모멘텀")
+5. **알고리즘 보고서와 중복 금지**: 퀀트 엔진이 이미 계산한 스코어/연쇄분석은 반복하지 말고, 뉴스를 더해서 "알고리즘이 못 잡은 것"을 분석하세요.
+6. **교육적 설명**: 어려운 개념이 나오면 즉시 한 문장으로 풀어주세요. (예: "이격도란 주가가 평균에서 얼마나 벗어났는지를 나타냅니다")
+7. **전문가 간 상호작용**: 다른 전문가의 분석에 보충하거나 반론할 수 있습니다. 기계적으로 각자 말하지 마세요.
+
+## 한국 시장 특성 (반드시 고려)
+1. **디커플링 가능성**: 미국 급락에도 한국은 개별 호재(반도체 수출, HBM 모멘텀)로 상승 가능합니다.
+2. **반도체 의존도**: 삼성/SK 강세 시 KOSPI 전체가 상승하는 구조입니다.
+3. **금리 영향의 단계성**:
+   - 금리 하락 **초기**(1-2일): 금융주 호재 (보유 채권 평가이익, 대출 수요 증가 기대)
+   - 금리 하락 **지속**(1-2주): 금융주 중립 (NIM 압박 우려 시작)
+   - 금리 하락 **장기**(1개월+): 금융주 악재 (NIM 실제 압박)
+4. **개별 호재 우선**: HBM4 출하 같은 게임체인저는 매크로 악재를 상쇄할 수 있습니다.
+5. **과도한 비관 경계**: "나쁜 금리 하락" 같은 단정적 프레임은 신중하게 사용하세요.
+
+## 실시간 정보 활용 가이드
+- 실시간 시장 컨텍스트는 "참고"입니다. 섹터별 예측은 독립적으로 판단하세요.
+- 실시간 정보와 데이터가 모순되면, 데이터를 우선하되 모순을 명시하세요.
 
 ## 참고 학술 근거 (필요할 때 인용)
 - BIS(2024): USD 10% 상승 → 신흥국 통화 4% 절하 → 주식시장 ~4% 하락
@@ -47,7 +71,7 @@ TEAM_SYSTEM_PROMPT = """당신은 신입 애널리스트를 교육하는 StockIQ
 - MOVE 120↑ = 채권시장 불안, 금리 급변 가능"""
 
 
-def _build_user_prompt(macro_data: Dict, news: Dict, portfolio_symbols: Optional[List[dict]] = None) -> str:
+def _build_user_prompt(macro_data: Dict, news: Dict, portfolio_symbols: Optional[List[dict]] = None, yesterday_pm_briefing: Optional[str] = None) -> str:
     """매크로 데이터 + 뉴스 → 사용자 프롬프트 조립"""
 
     # 매크로 데이터 요약 (토큰 절약용)
@@ -91,6 +115,16 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
     chain = macro_data.get("chain_analysis", "")
     chain_section = f"\n## 퀀트 엔진 연쇄분석\n{chain[:1500]}" if chain else ""
 
+    # 전날 PM 브리핑 (있으면)
+    pm_section = ""
+    if yesterday_pm_briefing:
+        pm_section = f"\n## 전날 PM 결산 (참고)\n{yesterday_pm_briefing[:2000]}\n\n[수석 전략가] 어제와 오늘의 연결고리를 찾으세요."
+
+    # 실시간 시장 컨텍스트 (있으면)
+    realtime_section = ""
+    if news.get("realtime_context"):
+        realtime_section = f"\n## 실시간 시장 컨텍스트 (브리핑 요청 시점 기준)\n{news['realtime_context']}\n\n**주의**: 위 정보는 참고용입니다. 섹터별 예측은 데이터와 뉴스를 종합하여 독립적으로 판단하세요."
+
     # 뉴스
     today_str = datetime.now().strftime("%Y년 %m월 %d일")
     news_section = ""
@@ -120,6 +154,8 @@ Tier B (수급): 외국인현물 {tb.get('foreign_cash',{}).get('net_amount',0):
     prompt = f"""{data_section}
 {calendar_section}
 {chain_section}
+{pm_section}
+{realtime_section}
 {news_section}
 {portfolio_section}
 
@@ -171,6 +207,7 @@ def generate_team_briefing(
     macro_data: Dict,
     news: Dict,
     portfolio_symbols: Optional[List[dict]] = None,
+    yesterday_pm_briefing: Optional[str] = None,
     model: str = DEFAULT_MODEL,
 ) -> Optional[str]:
     """팀 브리핑 생성"""
@@ -178,7 +215,7 @@ def generate_team_briefing(
         logger.warning("[LLMAnalyzer] OPENROUTER_API_KEY not set")
         return None
 
-    user_prompt = _build_user_prompt(macro_data, news, portfolio_symbols)
+    user_prompt = _build_user_prompt(macro_data, news, portfolio_symbols, yesterday_pm_briefing)
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",

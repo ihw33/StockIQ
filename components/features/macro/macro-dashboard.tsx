@@ -131,7 +131,7 @@ export function MacroDashboard() {
             const res = await fetch('/api/macro', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'am' }),
+                body: JSON.stringify({}), // mode 제거 - 백엔드에서 시간별 자동 선택
             });
             const json = await res.json();
             if (json.data) setData(json.data);

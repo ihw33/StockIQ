@@ -20,7 +20,7 @@ export default function StocksBrowsePage() {
       })
       const data = await res.json()
       setFetchResult(data.data)
-      alert(`✅ 크롤링 완료!\n\n업종: ${data.data.industries_count}개\n테마: ${data.data.themes_count}개\n총: ${data.data.total_sectors}개`)
+      alert(`✅ 크롤링 완료!\n\n가져온 시간: ${data.data.fetched_at}\n업종: ${data.data.industries.count}개\n테마: ${data.data.themes.count}개`)
     } catch (error) {
       console.error('Fetch error:', error)
       alert('크롤링 실패: ' + error)
@@ -60,44 +60,87 @@ export default function StocksBrowsePage() {
         {/* 크롤링 결과 */}
         {fetchResult && (
           <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-            <h3 className="text-lg font-bold mb-4 text-gray-800">📊 오늘의 섹터 동향 ({fetchResult.date})</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">📊 섹터 동향</h3>
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">시장 데이터:</span> {fetchResult.market_date}
+                <span className="mx-2">|</span>
+                <span className="font-medium">가져온 시간:</span> {fetchResult.fetched_at}
+              </div>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 상승 Top 10 */}
-              <div className="bg-white rounded-lg p-4 shadow-sm">
-                <h4 className="font-semibold text-red-600 mb-3 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  상승 Top 10
-                </h4>
-                <div className="space-y-2">
-                  {fetchResult.top_up.map((sector: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">
-                        {idx + 1}. {sector.name}
-                        <span className="ml-2 text-xs text-gray-500">({sector.type === 'industry' ? '업종' : '테마'})</span>
-                      </span>
-                      <span className="font-semibold text-red-600">+{sector.change_pct}%</span>
-                    </div>
-                  ))}
+            {/* 업종 */}
+            <div className="mb-6">
+              <h4 className="font-semibold text-gray-700 mb-3 text-sm">📈 업종 ({fetchResult.industries.count}개)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 업종 상승 */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h5 className="font-semibold text-red-600 mb-3 flex items-center gap-2 text-sm">
+                    <TrendingUp className="w-4 h-4" />
+                    상승 Top 10
+                  </h5>
+                  <div className="space-y-1.5">
+                    {fetchResult.industries.top_up.map((sector: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{idx + 1}. {sector.name}</span>
+                        <span className="font-semibold text-red-600">+{sector.change_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 업종 하락 */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h5 className="font-semibold text-blue-600 mb-3 flex items-center gap-2 text-sm">
+                    <TrendingDown className="w-4 h-4" />
+                    하락 Top 10
+                  </h5>
+                  <div className="space-y-1.5">
+                    {fetchResult.industries.top_down.map((sector: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{idx + 1}. {sector.name}</span>
+                        <span className="font-semibold text-blue-600">{sector.change_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* 하락 Top 10 */}
-              <div className="bg-white rounded-lg p-4 shadow-sm">
-                <h4 className="font-semibold text-blue-600 mb-3 flex items-center gap-2">
-                  <TrendingDown className="w-5 h-5" />
-                  하락 Top 10
-                </h4>
-                <div className="space-y-2">
-                  {fetchResult.top_down.map((sector: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">
-                        {idx + 1}. {sector.name}
-                        <span className="ml-2 text-xs text-gray-500">({sector.type === 'industry' ? '업종' : '테마'})</span>
-                      </span>
-                      <span className="font-semibold text-blue-600">{sector.change_pct}%</span>
-                    </div>
-                  ))}
+            {/* 테마 */}
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-3 text-sm">🎯 테마 ({fetchResult.themes.count}개)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 테마 상승 */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h5 className="font-semibold text-red-600 mb-3 flex items-center gap-2 text-sm">
+                    <TrendingUp className="w-4 h-4" />
+                    상승 Top 10
+                  </h5>
+                  <div className="space-y-1.5">
+                    {fetchResult.themes.top_up.map((sector: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{idx + 1}. {sector.name}</span>
+                        <span className="font-semibold text-red-600">+{sector.change_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 테마 하락 */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h5 className="font-semibold text-blue-600 mb-3 flex items-center gap-2 text-sm">
+                    <TrendingDown className="w-4 h-4" />
+                    하락 Top 10
+                  </h5>
+                  <div className="space-y-1.5">
+                    {fetchResult.themes.top_down.map((sector: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{idx + 1}. {sector.name}</span>
+                        <span className="font-semibold text-blue-600">{sector.change_pct}%</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

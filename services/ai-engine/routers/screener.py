@@ -12,6 +12,7 @@ from datetime import datetime
 from models.requests import ScreenerRequest
 from strategies.screener import run_custom_screen, get_screener, get_screener_profiles
 from collectors.kiwoom import KiwoomCollector
+from collectors.dart_collector import get_financial_statement
 from database import analysis_db
 
 router = APIRouter()
@@ -86,7 +87,9 @@ async def list_screener_cache(request: NewScreenerRequest):
         rows = await analysis_db.pool.fetch(
             """
             SELECT symbol, name, market, sector, industry, market_cap,
-                   per, pbr, roe, eps, bps, updated_at
+                   per, pbr, roe, eps, bps,
+                   revenue, operating_profit, operating_profit_growth,
+                   fiscal_period, updated_at
             FROM screener_cache
             WHERE classification_type = $1 AND classification_name = $2
             ORDER BY market_cap DESC NULLS LAST
@@ -109,6 +112,10 @@ async def list_screener_cache(request: NewScreenerRequest):
                 'roe': row['roe'],
                 'eps': row['eps'],
                 'bps': row['bps'],
+                'revenue': row['revenue'],
+                'operating_profit': row['operating_profit'],
+                'operating_profit_growth': float(row['operating_profit_growth']) if row['operating_profit_growth'] else None,
+                'fiscal_period': row['fiscal_period'] or '',
             })
 
         # 마지막 업데이트 시간
@@ -193,6 +200,14 @@ async def update_screener_cache(request: NewScreenerRequest):
                 await asyncio.sleep(0.3)  # Rate limit 방지
                 continue
 
+            # DART API로 재무제표 데이터 가져오기
+            financial = get_financial_statement(symbol)
+            # DART API는 "원" 단위로 리턴 → "억원"으로 변환
+            revenue = (financial.get('revenue', 0) // 100000000) if financial else 0
+            operating_profit = (financial.get('operating_profit', 0) // 100000000) if financial else 0
+            operating_profit_growth = financial.get('operating_profit_growth', 0) if financial else 0
+            fiscal_period = f"{financial.get('year', '')} {financial.get('quarter', '')}".strip() if financial else ''
+
             result = {
                 'symbol': symbol,
                 'name': info.get('stk_nm', 'N/A'),
@@ -205,6 +220,11 @@ async def update_screener_cache(request: NewScreenerRequest):
                 'roe': info.get('roe'),
                 'eps': info.get('eps'),
                 'bps': info.get('bps'),
+                # 재무제표 (DART)
+                'revenue': revenue,
+                'operating_profit': operating_profit,
+                'operating_profit_growth': operating_profit_growth,
+                'fiscal_period': fiscal_period,
                 # 거래 정보
                 'cur_price': info.get('cur_price'),
                 'volume': info.get('volume'),
@@ -238,8 +258,9 @@ async def update_screener_cache(request: NewScreenerRequest):
                 """
                 INSERT INTO screener_cache
                 (symbol, name, market, classification_type, classification_name,
-                 sector, industry, market_cap, per, pbr, roe, eps, bps, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+                 sector, industry, market_cap, per, pbr, roe, eps, bps,
+                 revenue, operating_profit, operating_profit_growth, fiscal_period, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
                 """,
                 result['symbol'],
                 result['name'],
@@ -253,7 +274,11 @@ async def update_screener_cache(request: NewScreenerRequest):
                 result['pbr'],
                 result['roe'],
                 result['eps'],
-                result['bps']
+                result['bps'],
+                result['revenue'],
+                result['operating_profit'],
+                result['operating_profit_growth'],
+                result['fiscal_period']
             )
 
         print(f"[Screener] Cache updated successfully")

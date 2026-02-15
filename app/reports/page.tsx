@@ -238,11 +238,10 @@ function ReportsContent() {
                             <LlmReportView analysis={selectedGroup.llmReport.analysis} />
                         )}
                         {selectedGroup.companyReport && (
-                            <div className="prose max-w-none">
-                                <div className="whitespace-pre-wrap text-gray-700">
-                                    {selectedGroup.companyReport.analysis}
-                                </div>
-                            </div>
+                            <LlmReportView
+                                analysis={selectedGroup.companyReport.analysis}
+                                mode="company"
+                            />
                         )}
                     </div>
                 ) : (

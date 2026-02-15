@@ -250,3 +250,167 @@ def get_company_overview(stock_code: str) -> Optional[dict]:
     except Exception as e:
         logger.error(f"[DART] 기업개황 조회 실패 ({stock_code}): {e}")
         return None
+
+
+# 재무제표 캐시 (메모리, 1일)
+_financial_statement_cache: Dict[str, dict] = {}
+_financial_statement_date: Optional[str] = None
+
+
+def get_financial_statement(stock_code: str) -> Optional[dict]:
+    """
+    DART 단일회사 전체 재무제표 API로 Q1+Q2+Q3 합산하여 누적 데이터 조회
+    Returns: {
+        'revenue': int,  # 매출액 (원, Q1+Q2+Q3 누적)
+        'operating_profit': int,  # 영업이익 (원, Q1+Q2+Q3 누적)
+        'operating_profit_growth': float,  # 영업이익증가율 (%, 전년 동기 대비)
+        'year': str,  # 회계연도
+        'quarter': str,  # "Q1-Q3 누적" 또는 "Annual"
+    }
+    """
+    global _financial_statement_cache, _financial_statement_date
+
+    if not DART_API_KEY:
+        logger.warning("[DART] DART_API_KEY not set")
+        return None
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    if _financial_statement_date != today:
+        _financial_statement_cache = {}
+        _financial_statement_date = today
+
+    if stock_code in _financial_statement_cache:
+        return _financial_statement_cache[stock_code]
+
+    corp_map = _load_corp_code_map()
+    corp_code = corp_map.get(stock_code)
+    if not corp_code:
+        logger.warning(f"[DART] corp_code not found for {stock_code}")
+        return None
+
+    current_year = datetime.now().year
+
+    # Helper function to fetch quarter data
+    def fetch_quarter(year: str, reprt_code: str, fs_div: str = "CFS") -> tuple:
+        """Returns (revenue, operating_profit) or (0, 0) if not found"""
+        try:
+            resp = requests.get(
+                f"{DART_BASE_URL}/fnlttSinglAcntAll.json",
+                params={
+                    "crtfc_key": DART_API_KEY,
+                    "corp_code": corp_code,
+                    "bsns_year": year,
+                    "reprt_code": reprt_code,
+                    "fs_div": fs_div,
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            if data.get("status") != "000":
+                return (0, 0)
+
+            revenue = 0
+            operating_profit = 0
+
+            for item in data.get("list", []):
+                sj_div = item.get("sj_div", "")
+                if sj_div not in ["IS", "CIS"]:
+                    continue
+
+                account_nm = item.get("account_nm", "").strip()
+                thstrm_amount = item.get("thstrm_amount", "")
+
+                # 매출액
+                if account_nm in ["매출액", "수익(매출액)", "매출"]:
+                    try:
+                        revenue = int(str(thstrm_amount).replace(",", "")) if thstrm_amount and thstrm_amount != '-' else 0
+                    except:
+                        pass
+
+                # 영업이익
+                if account_nm in ["영업이익", "영업이익(손실)"]:
+                    try:
+                        operating_profit = int(str(thstrm_amount).replace(",", "")) if thstrm_amount and thstrm_amount != '-' else 0
+                    except:
+                        pass
+
+            return (revenue, operating_profit)
+        except:
+            return (0, 0)
+
+    try:
+        # 1. 최신 연도 결정 (2025년 또는 2024년)
+        # 현재 월이 4월 이전이면 전년도 사용
+        target_year = str(current_year - 1)  # 2025
+
+        # 2. Q1, Q2, Q3 조회 (CFS 우선, 없으면 OFS)
+        fs_div = "CFS"
+        q1_rev, q1_op = fetch_quarter(target_year, "11013", fs_div)
+        q2_rev, q2_op = fetch_quarter(target_year, "11012", fs_div)
+        q3_rev, q3_op = fetch_quarter(target_year, "11014", fs_div)
+
+        # CFS에 데이터가 없으면 OFS 시도
+        if q1_rev == 0 and q2_rev == 0 and q3_rev == 0:
+            fs_div = "OFS"
+            q1_rev, q1_op = fetch_quarter(target_year, "11013", fs_div)
+            q2_rev, q2_op = fetch_quarter(target_year, "11012", fs_div)
+            q3_rev, q3_op = fetch_quarter(target_year, "11014", fs_div)
+
+        # 3. 합산
+        revenue_cumulative = q1_rev + q2_rev + q3_rev
+        operating_profit_cumulative = q1_op + q2_op + q3_op
+
+        print(f"[DART-DEBUG] {target_year} Q1+Q2+Q3 합산: 매출 {revenue_cumulative/1000000000000:.1f}조, 영업이익 {operating_profit_cumulative/1000000000000:.1f}조 ({fs_div})")
+        print(f"[DART-DEBUG]   Q1: {q1_rev/1000000000000:.1f}조 / Q2: {q2_rev/1000000000000:.1f}조 / Q3: {q3_rev/1000000000000:.1f}조")
+
+        # 데이터가 없으면 연간 보고서 시도
+        if revenue_cumulative == 0:
+            print(f"[DART-DEBUG] 분기 데이터 없음, 연간 보고서 조회 시도")
+            annual_year = str(current_year - 2)  # 2024
+            revenue_cumulative, operating_profit_cumulative = fetch_quarter(annual_year, "11011", fs_div)
+
+            if revenue_cumulative > 0:
+                target_year = annual_year
+                quarter_label = "Annual"
+            else:
+                logger.warning(f"[DART] No financial data found for {stock_code}")
+                return None
+        else:
+            # 가장 최근 분기 결정
+            if q3_rev > 0:
+                quarter_label = "Q1-Q3 누적"
+            elif q2_rev > 0:
+                quarter_label = "Q1-Q2 누적"
+            else:
+                quarter_label = "Q1"
+
+        # 4. 전년 동기 대비 증가율 계산
+        prev_year = str(int(target_year) - 1)
+        prev_q1_rev, prev_q1_op = fetch_quarter(prev_year, "11013", fs_div)
+        prev_q2_rev, prev_q2_op = fetch_quarter(prev_year, "11012", fs_div)
+        prev_q3_rev, prev_q3_op = fetch_quarter(prev_year, "11014", fs_div)
+        prev_operating_profit_cumulative = prev_q1_op + prev_q2_op + prev_q3_op
+
+        operating_profit_growth = 0.0
+        if prev_operating_profit_cumulative and prev_operating_profit_cumulative != 0:
+            operating_profit_growth = ((operating_profit_cumulative - prev_operating_profit_cumulative) / abs(prev_operating_profit_cumulative)) * 100
+
+        result = {
+            "revenue": revenue_cumulative,
+            "operating_profit": operating_profit_cumulative,
+            "operating_profit_growth": round(operating_profit_growth, 2),
+            "year": target_year,
+            "quarter": quarter_label,
+        }
+
+        _financial_statement_cache[stock_code] = result
+        logger.info(f"[DART] 재무제표 조회: {stock_code} ({target_year} {quarter_label}) - 매출 {revenue_cumulative:,}원, 영업이익 {operating_profit_cumulative:,}원")
+        return result
+
+    except Exception as e:
+        logger.error(f"[DART] 재무제표 조회 실패 ({stock_code}): {e}")
+        import traceback
+        traceback.print_exc()
+        return None

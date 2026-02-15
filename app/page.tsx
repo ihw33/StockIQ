@@ -36,6 +36,46 @@ export default function Home() {
         changeGroup,
     } = useWatchlist();
 
+    // URL 쿼리 파라미터에서 종목 읽기
+    useEffect(() => {
+        const checkURL = () => {
+            const params = new URLSearchParams(window.location.search);
+            const stock = params.get('stock');
+
+            if (stock && stock !== activeSymbol) {
+                console.log('Setting stock from URL:', stock);
+                setActiveSymbol(stock);
+                fetchStockName(stock);
+            }
+        };
+
+        // 초기 로드
+        checkURL();
+
+        // URL 변경 감지 (interval로 지속 체크)
+        const interval = setInterval(checkURL, 500);
+
+        // popstate 이벤트도 감지
+        window.addEventListener('popstate', checkURL);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('popstate', checkURL);
+        };
+    }, [activeSymbol]);
+
+    const fetchStockName = async (code: string) => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/stocks/${code}`);
+            const data = await res.json();
+            if (data.name) {
+                setActiveName(data.name);
+            }
+        } catch (error) {
+            console.error('Failed to fetch stock name:', error);
+        }
+    };
+
     // Cmd+K for search
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,9 +122,15 @@ export default function Home() {
     };
 
     const handleSelectStock = (symbol: string, name: string) => {
+        console.log('handleSelectStock called:', symbol, name);
         setActiveSymbol(symbol);
         setActiveName(name);
     };
+
+    // activeSymbol 변경 감지
+    useEffect(() => {
+        console.log('activeSymbol changed to:', activeSymbol);
+    }, [activeSymbol]);
 
     return (
         <main className="min-h-screen bg-slate-950 text-slate-100">

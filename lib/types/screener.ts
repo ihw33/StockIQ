@@ -14,6 +14,11 @@ export interface ScreenerResult {
     roe?: number;
     eps?: number;
     bps?: number;
+    // 재무제표 (DART)
+    revenue?: number;               // 매출액 (원)
+    operating_profit?: number;      // 영업이익 (원)
+    operating_profit_growth?: number;  // 영업이익증가율 (%)
+    fiscal_period?: string;         // 회계기간 (예: "2025 Q3")
     // 거래 정보
     cur_price?: number;
     change?: number;        // 전일대비

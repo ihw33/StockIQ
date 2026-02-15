@@ -6,15 +6,18 @@ import remarkGfm from 'remark-gfm';
 
 interface LlmReportViewProps {
     analysis: string;
+    mode?: 'llm' | 'company';
 }
 
-export function LlmReportView({ analysis }: LlmReportViewProps) {
+export function LlmReportView({ analysis, mode = 'llm' }: LlmReportViewProps) {
+    const title = mode === 'company' ? '기업 분석 보고서' : '종합 분석 보고서';
+
     return (
         <div className="bg-white">
             {/* Header - Document Style */}
             <div className="border-b-2 border-gray-900 pb-3 mb-6">
                 <h2 className="text-xl font-bold text-gray-900">
-                    종합 분석 보고서
+                    {title}
                 </h2>
             </div>
 

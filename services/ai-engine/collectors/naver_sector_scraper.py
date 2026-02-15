@@ -121,7 +121,7 @@ def scrape_themes() -> List[Dict]:
 
 
 def get_sector_extremes() -> Dict:
-    """상승/하락 Top 10 추출"""
+    """상승/하락 Top 10 추출 (업종/테마 분리)"""
     print("🔍 네이버 증권 크롤링 시작...")
 
     # 1. 업종 크롤링
@@ -131,25 +131,32 @@ def get_sector_extremes() -> Dict:
     # 2. 테마 크롤링
     themes = scrape_themes()
 
-    # 3. 전체 섹터 합치기
-    all_sectors = industries + themes
+    # 3. 업종별 정렬
+    industries_sorted = sorted(industries, key=lambda x: x['change_pct'], reverse=True)
+    industry_top_up = industries_sorted[:10]
+    industry_top_down = industries_sorted[-10:]
 
-    # 4. 정렬
-    all_sectors_sorted = sorted(all_sectors, key=lambda x: x['change_pct'], reverse=True)
-
-    # 5. Top 10 상승/하락
-    top_up = all_sectors_sorted[:10]
-    top_down = all_sectors_sorted[-10:]
+    # 4. 테마별 정렬
+    themes_sorted = sorted(themes, key=lambda x: x['change_pct'], reverse=True)
+    theme_top_up = themes_sorted[:10]
+    theme_top_down = themes_sorted[-10:]
 
     print(f"✅ 크롤링 완료: 업종 {len(industries)}개, 테마 {len(themes)}개")
 
     return {
-        'date': time.strftime('%Y-%m-%d'),
-        'total_sectors': len(all_sectors),
-        'top_up': top_up,
-        'top_down': top_down,
-        'industries_count': len(industries),
-        'themes_count': len(themes)
+        'market_date': time.strftime('%Y-%m-%d'),  # 시장 데이터 날짜
+        'fetched_at': time.strftime('%Y-%m-%d %H:%M:%S'),  # 실제 가져온 시간
+        'total_sectors': len(industries) + len(themes),
+        'industries': {
+            'count': len(industries),
+            'top_up': industry_top_up,
+            'top_down': industry_top_down
+        },
+        'themes': {
+            'count': len(themes),
+            'top_up': theme_top_up,
+            'top_down': theme_top_down
+        }
     }
 
 
