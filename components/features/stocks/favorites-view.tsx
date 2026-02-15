@@ -120,7 +120,7 @@ export function FavoritesView() {
       quantity
     })
 
-    alert(`${stock.name}을(를) 포트폴리오에 추가했습니다!`)
+    alert(`✅ ${stock.name}\n평균가: ${avgPrice.toLocaleString()}원\n수량: ${quantity}주\n\n보유 종목으로 전환되었습니다!`)
   }
 
   if (loading) {
@@ -200,7 +200,12 @@ export function FavoritesView() {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">종목명</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">시장</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">그룹</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">포트폴리오</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <div className="flex items-center gap-1">
+                  <Briefcase className="w-4 h-4 text-emerald-600" />
+                  <span>보유 전환</span>
+                </div>
+              </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">태그</th>
             </tr>
           </thead>
@@ -261,11 +266,11 @@ export function FavoritesView() {
                 <td className="px-4 py-3">
                   <button
                     onClick={(e) => handleAddToPortfolio(e, stock)}
-                    className="flex items-center gap-1 px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs rounded transition-colors"
-                    title="포트폴리오에 추가"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-semibold rounded-md shadow-sm transition-all"
+                    title="보유 종목으로 전환"
                   >
-                    <Briefcase className="w-3 h-3" />
-                    <span>추가</span>
+                    <Briefcase className="w-4 h-4" />
+                    <span>보유 전환</span>
                   </button>
                 </td>
                 <td className="px-4 py-3">
