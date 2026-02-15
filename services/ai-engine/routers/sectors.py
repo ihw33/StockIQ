@@ -21,7 +21,7 @@ async def get_db_connection():
     return await asyncpg.connect(
         host=os.getenv('DB_HOST', 'localhost'),
         port=int(os.getenv('DB_PORT', 5432)),
-        user=os.getenv('DB_USER', 'postgres'),
+        user=os.getenv('DB_USER', 'm4_macbook'),  # 현재 시스템 유저
         password=os.getenv('DB_PASSWORD', ''),
         database=os.getenv('DB_NAME', 'stockiq')
     )
