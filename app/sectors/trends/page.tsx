@@ -89,12 +89,20 @@ export default function SectorTrendsPage() {
               <Activity className="w-7 h-7 text-blue-600" />
               섹터 로테이션 동향
             </h1>
-            <button
-              onClick={() => window.location.href = '/stocks/browse'}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
-            >
-              종목 탐색으로
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.location.href = '/stocks/movers'}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                종목 동향
+              </button>
+              <button
+                onClick={() => window.location.href = '/stocks/browse'}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+              >
+                종목 탐색
+              </button>
+            </div>
           </div>
 
           {/* 필터 */}

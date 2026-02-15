@@ -16,7 +16,7 @@ env_path = os.path.join(os.path.dirname(__file__), '../../.env.local')
 load_dotenv(env_path)
 
 # Import routers
-from routers import strategy, reports, market, macro, screener, portfolio, alpha_hr, stocks, sectors
+from routers import strategy, reports, market, macro, screener, portfolio, alpha_hr, stocks, sectors, stocks_movers
 
 # Import for scheduler
 from models.requests import MacroCollectRequest
@@ -52,6 +52,7 @@ app.include_router(portfolio.router, tags=["portfolio"])
 app.include_router(alpha_hr.router, tags=["alpha-hr"])
 app.include_router(stocks.router, tags=["stocks"])
 app.include_router(sectors.router, tags=["sectors"])
+app.include_router(stocks_movers.router, tags=["stocks-movers"])
 
 # ==================== Macro Scheduler ====================
 

@@ -59,6 +59,14 @@ export default function StocksBrowsePage() {
               </button>
 
               <button
+                onClick={() => window.location.href = '/stocks/movers'}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow-md transition-all"
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>종목 동향</span>
+              </button>
+
+              <button
                 onClick={handleFetchSectors}
                 disabled={fetching}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"

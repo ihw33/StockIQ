@@ -32,7 +32,9 @@ async def save_extremes_to_db(data: Dict[str, Any]):
     conn = await get_db_connection()
 
     try:
-        market_date = data['market_date']
+        # 문자열 날짜를 date 객체로 변환
+        market_date_str = data['market_date']
+        market_date = datetime.strptime(market_date_str, '%Y-%m-%d').date()
         fetched_at = datetime.now()
 
         # 업종 저장
