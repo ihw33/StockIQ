@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ClassificationType, Classification } from '@/lib/types/stocks'
-import { Search, TrendingUp, TrendingDown } from 'lucide-react'
+import { Search } from 'lucide-react'
 
 interface ClassificationGridProps {
   type: ClassificationType
@@ -74,8 +74,8 @@ export function ClassificationGrid({ type }: ClassificationGridProps) {
   return (
     <div>
       {/* 검색 */}
-      <div className="mb-6">
-        <div className="relative max-w-md">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="relative max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
@@ -85,37 +85,51 @@ export function ClassificationGrid({ type }: ClassificationGridProps) {
             className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div className="mt-2 text-sm text-gray-600">
+        <div className="ml-4 text-sm text-gray-600 font-medium">
           총 {filteredData.length}개
         </div>
       </div>
 
-      {/* 카드 그리드 */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {filteredData.map((item) => (
-          <button
-            key={item.name}
-            onClick={() => handleCardClick(item.name)}
-            className="p-4 border rounded-lg hover:shadow-lg transition-shadow text-left bg-white"
-          >
-            <div className="font-medium mb-2 truncate" title={item.name}>
-              {item.name}
-            </div>
-            <div className="text-sm text-gray-600 mb-2">
-              {item.total_stocks}개 종목
-            </div>
-            <div className={`flex items-center gap-1 text-sm font-medium ${
-              item.change_pct > 0 ? 'text-red-600' : item.change_pct < 0 ? 'text-blue-600' : 'text-gray-600'
-            }`}>
-              {item.change_pct > 0 ? (
-                <TrendingUp className="w-4 h-4" />
-              ) : item.change_pct < 0 ? (
-                <TrendingDown className="w-4 h-4" />
-              ) : null}
-              <span>{item.change_pct > 0 ? '+' : ''}{item.change_pct.toFixed(2)}%</span>
-            </div>
-          </button>
-        ))}
+      {/* 테이블 뷰 */}
+      <div className="border rounded-lg overflow-hidden bg-white">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">이름</th>
+              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">종목 수</th>
+              <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 w-32">상세보기</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {filteredData.map((item) => (
+              <tr
+                key={item.name}
+                className="hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => handleCardClick(item.name)}
+              >
+                <td className="px-6 py-4">
+                  <div className="font-medium text-gray-900">{item.name}</div>
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {item.total_stocks}개
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCardClick(item.name)
+                    }}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
+                  >
+                    보기
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )
