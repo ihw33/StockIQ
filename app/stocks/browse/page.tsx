@@ -18,12 +18,24 @@ export default function StocksBrowsePage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/sectors/fetch`, {
         method: 'POST'
       })
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(`HTTP ${res.status}: ${errorText}`)
+      }
+
       const data = await res.json()
+      console.log('Response data:', data)
+
+      if (!data.success || !data.data) {
+        throw new Error(data.message || '데이터 형식 오류')
+      }
+
       setFetchResult(data.data)
       alert(`✅ 크롤링 완료!\n\n가져온 시간: ${data.data.fetched_at}\n업종: ${data.data.industries.count}개\n테마: ${data.data.themes.count}개`)
     } catch (error) {
       console.error('Fetch error:', error)
-      alert('크롤링 실패: ' + error)
+      alert('크롤링 실패:\n' + (error instanceof Error ? error.message : String(error)))
     } finally {
       setFetching(false)
     }
