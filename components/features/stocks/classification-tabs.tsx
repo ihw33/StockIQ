@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { ClassificationType } from '@/lib/types/stocks'
 import { useFavoritesStore } from '@/lib/stores/favorites-store'
 import { Star } from 'lucide-react'
@@ -10,13 +11,19 @@ interface ClassificationTabsProps {
 }
 
 export function ClassificationTabs({ activeTab, onTabChange }: ClassificationTabsProps) {
+  const [favoritesCount, setFavoritesCount] = useState(0)
   const favorites = useFavoritesStore((state) => state.getFavorites())
+
+  // 클라이언트에서만 카운트 업데이트 (hydration 에러 방지)
+  useEffect(() => {
+    setFavoritesCount(favorites.length)
+  }, [favorites.length])
 
   const tabs = [
     { id: 'industry' as ClassificationType, label: '업종', count: 79 },
     { id: 'theme' as ClassificationType, label: '테마', count: 260 },
     { id: 'group' as ClassificationType, label: '그룹', count: 62 },
-    { id: 'favorites' as ClassificationType, label: '관심종목', count: favorites.length, icon: Star },
+    { id: 'favorites' as ClassificationType, label: '관심종목', count: favoritesCount, icon: Star },
   ]
 
   return (

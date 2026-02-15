@@ -4,13 +4,15 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFavoritesStore } from '@/lib/stores/favorites-store'
 import { useWatchlist } from '@/lib/hooks/use-watchlist'
+import { usePortfolioStore } from '@/lib/stores/portfolio-store'
 import { Stock } from '@/lib/types/stocks'
-import { Star, Download, FolderInput } from 'lucide-react'
+import { Star, Download, FolderInput, Briefcase } from 'lucide-react'
 
 export function FavoritesView() {
   const router = useRouter()
   const { getFavorites, isFavorite, toggleFavorite } = useFavoritesStore()
   const { addToWatchlist, removeFromWatchlist, getItemGroup, changeGroup, groups } = useWatchlist()
+  const { addPosition } = usePortfolioStore()
   const favoriteCodes = getFavorites()
 
   const [stocks, setStocks] = useState<Stock[]>([])
@@ -90,6 +92,37 @@ export function FavoritesView() {
     changeGroup(stock.code, newGroup)
   }
 
+  const handleAddToPortfolio = (e: React.MouseEvent, stock: Stock) => {
+    e.stopPropagation()
+
+    const avgPriceInput = prompt(`${stock.name} 평균 매수가를 입력하세요:`)
+    if (!avgPriceInput) return
+
+    const avgPrice = parseFloat(avgPriceInput)
+    if (isNaN(avgPrice) || avgPrice <= 0) {
+      alert('올바른 가격을 입력해주세요.')
+      return
+    }
+
+    const quantityInput = prompt('보유 수량을 입력하세요:')
+    if (!quantityInput) return
+
+    const quantity = parseInt(quantityInput)
+    if (isNaN(quantity) || quantity <= 0) {
+      alert('올바른 수량을 입력해주세요.')
+      return
+    }
+
+    addPosition({
+      symbol: stock.code,
+      symbolName: stock.name,
+      avgPrice,
+      quantity
+    })
+
+    alert(`${stock.name}을(를) 포트폴리오에 추가했습니다!`)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -167,6 +200,7 @@ export function FavoritesView() {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">종목명</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">시장</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">그룹</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">포트폴리오</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">태그</th>
             </tr>
           </thead>
@@ -223,6 +257,16 @@ export function FavoritesView() {
                       )
                     })}
                   </div>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={(e) => handleAddToPortfolio(e, stock)}
+                    className="flex items-center gap-1 px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs rounded transition-colors"
+                    title="포트폴리오에 추가"
+                  >
+                    <Briefcase className="w-3 h-3" />
+                    <span>추가</span>
+                  </button>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
