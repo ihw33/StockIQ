@@ -42,6 +42,11 @@ export default function StocksBrowsePage() {
   const [sortField, setSortField] = useState<SortField>('market_cap')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
+  // 배치 업데이트 상태
+  const [batchUpdating, setBatchUpdating] = useState(false)
+  const [batchId, setBatchId] = useState<string | null>(null)
+  const [batchStatus, setBatchStatus] = useState<any>(null)
+
   const handleSectorClick = async (sectorName: string, sectorType: 'industry' | 'theme') => {
     setSelectedSector({ name: sectorName, type: sectorType })
     setLoadingStocks(true)
@@ -102,6 +107,104 @@ export default function StocksBrowsePage() {
       alert('전체 업데이트 실패: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
       setUpdating(false)
+    }
+  }
+
+  // 전체 섹터 배치 업데이트
+  const handleBatchUpdate = async () => {
+    if (batchUpdating) return
+
+    const confirmed = confirm(
+      '전체 섹터 일괄 업데이트를 시작하시겠습니까?\n\n' +
+      '• 예상 소요 시간: 약 2-3시간\n' +
+      '• 업종: ~50개\n' +
+      '• 테마: ~280개\n\n' +
+      '백그라운드에서 실행되며, 페이지를 이동해도 계속 진행됩니다.'
+    )
+
+    if (!confirmed) return
+
+    setBatchUpdating(true)
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/update-all-sectors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (!res.ok) {
+        // 409: 이미 실행 중인 배치가 있음
+        if (res.status === 409) {
+          const errorData = await res.json()
+          alert(`⚠️ 이미 다른 배치 업데이트가 실행 중입니다.\n\n${errorData.detail}`)
+          setBatchUpdating(false)
+          return
+        }
+        throw new Error(`HTTP ${res.status}`)
+      }
+
+      const data = await res.json()
+      setBatchId(data.batch_id)
+
+      // 진행 상황 폴링 시작
+      const interval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/batch-status/${data.batch_id}`)
+          if (!statusRes.ok) {
+            clearInterval(interval)
+            return
+          }
+
+          const statusData = await statusRes.json()
+          setBatchStatus(statusData)
+
+          // 완료 또는 취소 시 폴링 중지
+          if (statusData.status === 'completed' || statusData.status === 'cancelled' || statusData.status === 'failed') {
+            clearInterval(interval)
+            setBatchUpdating(false)
+
+            if (statusData.status === 'completed') {
+              alert(`✅ 전체 섹터 업데이트 완료!\n\n${statusData.completed}/${statusData.total} 섹터 업데이트됨`)
+            } else if (statusData.status === 'cancelled') {
+              alert('⚠️ 배치 업데이트가 취소되었습니다.')
+            } else if (statusData.status === 'failed') {
+              alert(`❌ 배치 업데이트 실패:\n\n${statusData.error}`)
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch batch status:', err)
+        }
+      }, 1000)
+
+    } catch (error) {
+      console.error('Batch update start error:', error)
+      alert('배치 업데이트 시작 실패: ' + (error instanceof Error ? error.message : String(error)))
+      setBatchUpdating(false)
+    }
+  }
+
+  // 배치 업데이트 취소
+  const handleBatchCancel = async () => {
+    if (!batchId) return
+
+    const confirmed = confirm('배치 업데이트를 취소하시겠습니까?')
+    if (!confirmed) return
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/batch-cancel/${batchId}`, {
+        method: 'POST'
+      })
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+
+      const data = await res.json()
+      alert(data.message)
+
+    } catch (error) {
+      console.error('Batch cancel error:', error)
+      alert('배치 취소 실패: ' + (error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -280,8 +383,48 @@ export default function StocksBrowsePage() {
                 <Download className={`w-4 h-4 ${fetching ? 'animate-bounce' : ''}`} />
                 <span>{fetching ? '크롤링 중...' : '섹터 데이터 가져오기'}</span>
               </button>
+
+              <button
+                onClick={handleBatchUpdate}
+                disabled={batchUpdating}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-sm font-semibold rounded-lg shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`w-4 h-4 ${batchUpdating ? 'animate-spin' : ''}`} />
+                <span>{batchUpdating ? '전체 업데이트 중...' : '🔄 모든 섹터 업데이트'}</span>
+              </button>
             </div>
           </div>
+
+          {/* 배치 업데이트 진행 상황 */}
+          {batchUpdating && batchStatus && (
+            <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <RefreshCw className="w-4 h-4 animate-spin text-orange-600" />
+                    <span className="text-sm font-semibold text-gray-900">
+                      {batchStatus.current_type === 'industry' ? '업종' : '테마'}: {batchStatus.current_sector}
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      ({batchStatus.completed}/{batchStatus.total})
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full transition-all"
+                      style={{ width: `${(batchStatus.completed / batchStatus.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleBatchCancel}
+                  className="ml-4 px-3 py-1 bg-white hover:bg-gray-100 text-gray-700 text-sm font-medium rounded border border-gray-300 transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* 탭 */}
           <ClassificationTabs

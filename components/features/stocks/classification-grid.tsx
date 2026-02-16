@@ -55,9 +55,9 @@ export function ClassificationGrid({ type }: ClassificationGridProps) {
     }
   }
 
-  const filteredData = data.filter((item) =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredData = data
+    .filter((item) => item.name !== '기타')  // ETF/ETN 제외 (Kiwoom API 미지원)
+    .filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const handleCardClick = (name: string) => {
     router.push(`/stocks/browse/${type}/${encodeURIComponent(name)}`)
