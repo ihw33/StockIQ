@@ -330,3 +330,34 @@ async def get_after_hours(symbol: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/market/calendar")
+def get_market_calendar(days: int = 60):
+    """
+    최근 N일의 거래일/휴장일 정보 반환
+    - is_trading_day: bool
+    - reason: 휴장 이유 (토요일/일요일/공휴일명)
+    - day_of_week: 요일 (월~일)
+    """
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from utils.market_calendar import get_market_status
+    from datetime import date, timedelta
+
+    DAYS_KR = ['월', '화', '수', '목', '금', '토', '일']
+    today = date.today()
+    result = []
+
+    for i in range(days):
+        d = today - timedelta(days=i)
+        status = get_market_status(d)
+        result.append({
+            'date': d.isoformat(),
+            'day_of_week': DAYS_KR[d.weekday()] + '요일',
+            'is_trading_day': status['is_trading_day'],
+            'reason': status['reason'],
+        })
+
+    return {'success': True, 'calendar': result}

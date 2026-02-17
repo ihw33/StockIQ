@@ -12,6 +12,7 @@ from datetime import datetime
 # collectors 경로 추가
 sys.path.append(str(Path(__file__).parent.parent))
 from collectors.naver_stocks_scraper import get_stocks_extremes
+from utils.market_calendar import is_market_open, get_market_status
 
 router = APIRouter(prefix="/api/stocks/movers", tags=["stocks-movers"])
 
@@ -78,6 +79,19 @@ async def fetch_stocks_data(limit: int = 50) -> Dict[str, Any]:
     - 상승 Top N
     - 하락 Top N
     """
+    # 장 개장 여부 체크 (주말 + 공휴일)
+    if not is_market_open():
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo('Asia/Seoul'))
+        status = get_market_status(now.date())
+        reason = status.get('reason', '비거래일')
+        return {
+            'success': False,
+            'message': f"장이 열리지 않는 날입니다 ({reason}, 현재: {now.strftime('%Y-%m-%d %H:%M KST')})",
+            'data': None
+        }
+
     try:
         result = get_stocks_extremes(limit=limit)
 

@@ -7,9 +7,10 @@ import { Search } from 'lucide-react'
 
 interface ClassificationGridProps {
   type: ClassificationType
+  onSectorClick?: (name: string, type: 'industry' | 'theme' | 'group') => void
 }
 
-export function ClassificationGrid({ type }: ClassificationGridProps) {
+export function ClassificationGrid({ type, onSectorClick }: ClassificationGridProps) {
   const router = useRouter()
   const [data, setData] = useState<Classification[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,7 +61,11 @@ export function ClassificationGrid({ type }: ClassificationGridProps) {
     .filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const handleCardClick = (name: string) => {
-    router.push(`/stocks/browse/${type}/${encodeURIComponent(name)}`)
+    if (onSectorClick) {
+      onSectorClick(name, type as 'industry' | 'theme' | 'group')
+    } else {
+      router.push(`/stocks/browse/${type}/${encodeURIComponent(name)}`)
+    }
   }
 
   if (loading) {

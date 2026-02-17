@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { TrendingUp, TrendingDown, Activity, Download, BarChart3 } from 'lucide-react'
+import { useMarketCalendar } from '@/lib/hooks/use-market-calendar'
 
 type TimeRange = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 
@@ -27,6 +29,7 @@ export default function StockMoversPage() {
   const [fetching, setFetching] = useState(false)
   const [fetchResult, setFetchResult] = useState<any>(null)
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set())
+  const { getDateLabel } = useMarketCalendar()
 
   const timeRangeOptions = [
     { value: 'daily' as TimeRange, label: '일간', days: 30 },
@@ -218,9 +221,9 @@ export default function StockMoversPage() {
                 <div className="space-y-2">
                   {getTopFrequentStocks('rising').map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">
+                      <Link href={`/?stock=${item.code}`} className="text-gray-700 hover:text-blue-600 hover:underline">
                         {idx + 1}. {item.name} <span className="text-gray-400">({item.code})</span>
-                      </span>
+                      </Link>
                       <span className="font-semibold text-red-600">{item.count}회</span>
                     </div>
                   ))}
@@ -238,9 +241,9 @@ export default function StockMoversPage() {
                 <div className="space-y-2">
                   {getTopFrequentStocks('falling').map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">
+                      <Link href={`/?stock=${item.code}`} className="text-gray-700 hover:text-blue-600 hover:underline">
                         {idx + 1}. {item.name} <span className="text-gray-400">({item.code})</span>
-                      </span>
+                      </Link>
                       <span className="font-semibold text-blue-600">{item.count}회</span>
                     </div>
                   ))}
@@ -260,11 +263,20 @@ export default function StockMoversPage() {
                   const dayData = historyData[date]
                   const isExpanded = expandedDates.has(date)
                   const displayLimit = isExpanded ? 50 : 20
+                  const { label: dayLabel, isHoliday, reason } = getDateLabel(date)
 
                   return (
                     <div key={date} className="p-6 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="font-semibold text-gray-900">{date}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">{date}</span>
+                          <span className="text-sm text-gray-500">{dayLabel}</span>
+                          {isHoliday && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                              {reason || '휴장'}
+                            </span>
+                          )}
+                        </div>
                         {(dayData.rising.length > 20 || dayData.falling.length > 20) && (
                           <button
                             onClick={() => toggleExpand(date)}
@@ -285,7 +297,9 @@ export default function StockMoversPage() {
                             {dayData.rising.slice(0, displayLimit).map((stock, i) => (
                               <div key={i} className="flex items-center justify-between text-xs">
                                 <div className="flex-1">
-                                  <span className="text-gray-700 font-medium">{stock.name}</span>
+                                  <Link href={`/?stock=${stock.code}`} className="text-gray-700 font-medium hover:text-blue-600 hover:underline">
+                                    {stock.name}
+                                  </Link>
                                   <span className="text-gray-400 ml-1">({stock.code})</span>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -308,7 +322,9 @@ export default function StockMoversPage() {
                             {dayData.falling.slice(0, displayLimit).map((stock, i) => (
                               <div key={i} className="flex items-center justify-between text-xs">
                                 <div className="flex-1">
-                                  <span className="text-gray-700 font-medium">{stock.name}</span>
+                                  <Link href={`/?stock=${stock.code}`} className="text-gray-700 font-medium hover:text-blue-600 hover:underline">
+                                    {stock.name}
+                                  </Link>
                                   <span className="text-gray-400 ml-1">({stock.code})</span>
                                 </div>
                                 <div className="flex items-center gap-3">
