@@ -4,8 +4,41 @@ from collectors.kiwoom import KiwoomCollector
 from collectors.macro_dashboard import MacroDashboardCollector
 from datetime import datetime as dt
 import requests as req
+import FinanceDataReader as fdr
 
 router = APIRouter()
+
+
+@router.get("/api/market/summary")
+def get_market_summary():
+    """홈 화면용 시장 요약 (코스피/코스닥/나스닥 현재가 및 등락률)"""
+    result = {}
+    indices = {
+        "KOSPI": "KS11",
+        "KOSDAQ": "KQ11",
+        "NASDAQ": "IXIC",
+    }
+    for name, ticker in indices.items():
+        try:
+            df = fdr.DataReader(ticker, period="5d")
+            if df.empty or len(df) < 2:
+                result[name] = {"status": "no_data"}
+                continue
+            latest = df.iloc[-1]
+            prev = df.iloc[-2]
+            close = float(latest["Close"])
+            prev_close = float(prev["Close"])
+            change = close - prev_close
+            change_pct = (change / prev_close) * 100 if prev_close else 0
+            result[name] = {
+                "close": round(close, 2),
+                "change": round(change, 2),
+                "change_pct": round(change_pct, 2),
+                "date": str(df.index[-1].date()),
+            }
+        except Exception as e:
+            result[name] = {"status": "error", "message": str(e)}
+    return result
 
 
 @router.get("/api/market/map")

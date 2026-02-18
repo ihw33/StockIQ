@@ -139,6 +139,62 @@ async def list_screener_cache(request: NewScreenerRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/screener/v2/all")
+async def get_all_stocks():
+    """
+    전체 종목 리스트 조회 (중복 제거, 시가총액 순)
+    """
+    try:
+        await analysis_db.connect()
+
+        # 중복 제거: symbol별 최신 데이터만 조회
+        rows = await analysis_db.pool.fetch(
+            """
+            SELECT DISTINCT ON (symbol)
+                symbol, name, market, sector, industry, market_cap,
+                per, pbr, roe, eps, bps,
+                revenue, operating_profit, operating_profit_growth,
+                fiscal_period, updated_at
+            FROM screener_cache
+            ORDER BY symbol, updated_at DESC
+            """
+        )
+
+        results = []
+        for row in rows:
+            results.append({
+                'symbol': row['symbol'],
+                'name': row['name'],
+                'market': row['market'],
+                'sector': row['sector'],
+                'industry': row['industry'],
+                'market_cap': row['market_cap'],
+                'per': row['per'],
+                'pbr': row['pbr'],
+                'roe': row['roe'],
+                'eps': row['eps'],
+                'bps': row['bps'],
+                'revenue': row['revenue'],
+                'operating_profit': row['operating_profit'],
+                'operating_profit_growth': float(row['operating_profit_growth']) if row['operating_profit_growth'] else None,
+                'fiscal_period': row['fiscal_period'] or '',
+            })
+
+        # 시가총액 순 정렬
+        results.sort(key=lambda x: x['market_cap'] or 0, reverse=True)
+
+        return {
+            'total': len(results),
+            'results': results,
+            'last_updated': rows[0]['updated_at'].isoformat() if rows else None
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/api/screener/v2/update")
 async def update_screener_cache(request: NewScreenerRequest):
     """
@@ -150,8 +206,10 @@ async def update_screener_cache(request: NewScreenerRequest):
             classifications = STOCK_CLASSIFICATIONS.get('themes', {})
         elif request.type == 'industry':
             classifications = STOCK_CLASSIFICATIONS.get('industries', {})
+        elif request.type == 'group':
+            classifications = STOCK_CLASSIFICATIONS.get('groups', {})
         else:
-            raise HTTPException(status_code=400, detail=f"Invalid type: {request.type}. Use 'theme' or 'industry'")
+            raise HTTPException(status_code=400, detail=f"Invalid type: {request.type}. Use 'theme', 'industry', or 'group'")
 
         # 해당 분류 이름 찾기
         if request.name not in classifications:
@@ -218,7 +276,7 @@ async def update_screener_cache(request: NewScreenerRequest):
                 'market': market_map.get(symbol, 'KOSPI'),
                 'sector': classification_data.get('description', request.name),
                 'industry': request.name,
-                'market_cap': marcap_map.get(symbol, 0),  # FDR 시가총액 사용
+                'market_cap': marcap_map.get(symbol, 0) // 100000000,  # FDR 시가총액 (원 → 억원)
                 'per': info.get('per'),
                 'pbr': info.get('pbr'),
                 'roe': info.get('roe'),
@@ -393,6 +451,7 @@ async def run_batch_update(batch_id: str):
         # 1단계: 전체 종목 코드 수집 + 섹터 매핑
         industries_data = STOCK_CLASSIFICATIONS.get('industries', {})
         themes_data = STOCK_CLASSIFICATIONS.get('themes', {})
+        groups_data = STOCK_CLASSIFICATIONS.get('groups', {})
 
         # 종목 → 섹터 매핑 (한 종목이 여러 섹터에 속할 수 있음)
         symbol_to_sectors = {}  # {symbol: [(type, name), ...]}
@@ -410,6 +469,12 @@ async def run_batch_update(batch_id: str):
                 if symbol not in symbol_to_sectors:
                     symbol_to_sectors[symbol] = []
                 symbol_to_sectors[symbol].append(('theme', theme_name))
+
+        for group_name, group_data in groups_data.items():
+            for symbol in group_data.get('codes', []):
+                if symbol not in symbol_to_sectors:
+                    symbol_to_sectors[symbol] = []
+                symbol_to_sectors[symbol].append(('group', group_name))
 
         unique_symbols = list(symbol_to_sectors.keys())
         total_symbols = len(unique_symbols)
@@ -473,7 +538,7 @@ async def run_batch_update(batch_id: str):
                     'symbol': symbol,
                     'name': info.get('stk_nm', 'N/A'),
                     'market': market_map.get(symbol, 'KOSPI'),
-                    'market_cap': marcap_map.get(symbol, 0),
+                    'market_cap': marcap_map.get(symbol, 0) // 100000000,  # FDR 시가총액 (원 → 억원)
                     'per': info.get('per'),
                     'pbr': info.get('pbr'),
                     'roe': info.get('roe'),
@@ -638,3 +703,205 @@ async def cancel_batch_update(batch_id: str):
             'message': f"Cannot cancel: status is '{BATCH_JOBS[batch_id]['status']}'",
             'status': BATCH_JOBS[batch_id]['status']
         }
+
+
+# ==================== 종목 발굴 (Discover) ====================
+
+DB_URL = os.environ.get("DATABASE_URL", "postgresql://localhost/stockiq")
+
+PRESETS = {
+    "value": {
+        "label": "저평가 가치주",
+        "desc": "PBR < 1.5 + ROE > 10% + PER < 20",
+        "conditions": "pbr > 0 AND pbr < 1.5 AND roe > 10 AND per > 0 AND per < 20",
+        "order": "roe DESC",
+    },
+    "growth": {
+        "label": "성장주",
+        "desc": "영업이익증가율 > 20% + ROE > 10%",
+        "conditions": "operating_profit_growth > 20 AND roe > 10 AND per > 0",
+        "order": "operating_profit_growth DESC",
+    },
+    "bluechip": {
+        "label": "대형 우량주",
+        "desc": "시총 > 1조 + ROE > 10%",
+        "conditions": "market_cap > 10000 AND roe > 10 AND per > 0",
+        "order": "market_cap DESC",
+    },
+    "low_per": {
+        "label": "저PER",
+        "desc": "PER 0 ~ 10배",
+        "conditions": "per > 0 AND per < 10 AND pbr > 0",
+        "order": "per ASC",
+    },
+}
+
+
+@router.get("/api/screener/classifications")
+async def get_classifications():
+    """업종/테마 목록 반환 (드롭다운용)"""
+    conn = await asyncpg.connect(DB_URL)
+    try:
+        rows = await conn.fetch("""
+            SELECT classification_type, classification_name, COUNT(DISTINCT symbol) AS cnt
+            FROM screener_cache
+            WHERE classification_type IN ('industry', 'theme')
+            GROUP BY classification_type, classification_name
+            ORDER BY classification_type, cnt DESC
+        """)
+        industries = [{"name": r["classification_name"], "count": r["cnt"]} for r in rows if r["classification_type"] == "industry"]
+        themes = [{"name": r["classification_name"], "count": r["cnt"]} for r in rows if r["classification_type"] == "theme"]
+        return {"industries": industries, "themes": themes}
+    finally:
+        await conn.close()
+
+
+@router.get("/api/screener/discover")
+async def discover_stocks(
+    preset: Optional[str] = None,
+    cls_type: Optional[str] = None,
+    cls_name: Optional[str] = None,
+    per_min: Optional[float] = None,
+    per_max: Optional[float] = None,
+    pbr_max: Optional[float] = None,
+    roe_min: Optional[float] = None,
+    market_cap_min: Optional[int] = None,
+    op_growth_min: Optional[float] = None,
+    limit: int = 50,
+):
+    """
+    종목 발굴 API — screener_cache에서 조건 기반 조회
+    preset: value | growth | bluechip | low_per (선택 시 해당 조건 자동 적용)
+    """
+    conn = await asyncpg.connect(DB_URL)
+    try:
+        conditions = ["per > 0", "pbr > 0", "roe IS NOT NULL"]
+        order_by = "roe DESC"
+
+        if cls_type and cls_name:
+            # 업종/테마 필터: 해당 분류에 속하는 종목만 (재무 조건 없이)
+            safe_type = cls_type.replace("'", "''")
+            safe_name = cls_name.replace("'", "''")
+            conditions = [f"classification_type = '{safe_type}'", f"classification_name = '{safe_name}'"]
+            order_by = "market_cap DESC"
+        elif preset and preset in PRESETS:
+            p = PRESETS[preset]
+            conditions = [p["conditions"]]
+            order_by = p["order"]
+        else:
+            # 수동 필터
+            if per_min is not None:
+                conditions.append(f"per >= {per_min}")
+            if per_max is not None:
+                conditions.append(f"per <= {per_max}")
+            if pbr_max is not None:
+                conditions.append(f"pbr <= {pbr_max}")
+            if roe_min is not None:
+                conditions.append(f"roe >= {roe_min}")
+            if market_cap_min is not None:
+                conditions.append(f"market_cap >= {market_cap_min}")
+            if op_growth_min is not None:
+                conditions.append(f"operating_profit_growth >= {op_growth_min}")
+
+        where = " AND ".join(conditions)
+
+        # DISTINCT ON (symbol): 같은 종목이 여러 분류에 존재 → 중복 제거
+        # 테마 태그는 correlated subquery로 집계 (최대 5개)
+        query = f"""
+            WITH base AS (
+                SELECT DISTINCT ON (symbol)
+                    symbol, name, market, market_cap,
+                    per, pbr, roe, eps,
+                    revenue, operating_profit_growth,
+                    industry, updated_at
+                FROM screener_cache
+                WHERE {where}
+                ORDER BY symbol, {order_by}
+                LIMIT {limit}
+            )
+            SELECT
+                b.*,
+                ARRAY(
+                    SELECT classification_name
+                    FROM screener_cache c
+                    WHERE c.symbol = b.symbol AND c.classification_type = 'theme'
+                    ORDER BY classification_name
+                    LIMIT 5
+                ) AS themes
+            FROM base b
+        """
+
+        rows = await conn.fetch(query)
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get("updated_at"):
+                d["updated_at"] = d["updated_at"].isoformat()
+            d["themes"] = list(d.get("themes") or [])
+            results.append(d)
+
+        # 중복 제거 후 order_by 기준으로 재정렬
+        sort_key = order_by.split()[0]
+        reverse = "DESC" in order_by.upper()
+        results.sort(key=lambda x: (x.get(sort_key) is None, x.get(sort_key) or 0), reverse=reverse)
+
+        # 캐시 마지막 업데이트 시간
+        last_updated = await conn.fetchval("SELECT MAX(updated_at) FROM screener_cache")
+        last_updated_str = last_updated.isoformat() if last_updated else None
+
+        return {
+            "preset": preset,
+            "presets": {k: {"label": v["label"], "desc": v["desc"]} for k, v in PRESETS.items()},
+            "total": len(results),
+            "results": results,
+            "last_updated": last_updated_str,
+        }
+    finally:
+        await conn.close()
+
+
+@router.get("/api/screener/search")
+async def search_stocks(q: str = "", limit: int = 10):
+    """
+    종목명/코드 검색 — screener_cache에서 조회
+    선택된 종목의 재무 지표를 반환 (유사 종목 검색용)
+    """
+    if not q or len(q.strip()) < 1:
+        return {"results": []}
+
+    conn = await asyncpg.connect(DB_URL)
+    try:
+        keyword = q.strip()
+        rows = await conn.fetch("""
+            WITH base AS (
+                SELECT DISTINCT ON (symbol)
+                    symbol, name, market, market_cap,
+                    per, pbr, roe, eps,
+                    revenue, operating_profit_growth, industry
+                FROM screener_cache
+                WHERE name ILIKE $1 OR symbol ILIKE $2
+                ORDER BY symbol, name
+                LIMIT $3
+            )
+            SELECT
+                b.*,
+                ARRAY(
+                    SELECT classification_name
+                    FROM screener_cache c
+                    WHERE c.symbol = b.symbol AND c.classification_type = 'theme'
+                    ORDER BY classification_name
+                    LIMIT 5
+                ) AS themes
+            FROM base b
+        """, f"%{keyword}%", f"%{keyword}%", limit)
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["themes"] = list(d.get("themes") or [])
+            results.append(d)
+
+        return {"results": results}
+    finally:
+        await conn.close()

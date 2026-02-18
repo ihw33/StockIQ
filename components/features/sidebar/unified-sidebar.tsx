@@ -56,6 +56,16 @@ export function UnifiedSidebar({
             syncFromKiwoom();
         }
     }, []);
+
+    // 보유 종목이 관심목록에 있으면 자동 제거
+    React.useEffect(() => {
+        if (positions.length === 0) return;
+        positions.forEach(p => {
+            if (watchlist.some(w => w.symbol === p.symbol)) {
+                onRemoveFromWatchlist(p.symbol);
+            }
+        });
+    }, [positions]);
     const totalProfitRate = totalValue > 0 ? (totalProfit / (totalValue - totalProfit)) * 100 : 0;
 
     const [positionModal, setPositionModal] = useState<{

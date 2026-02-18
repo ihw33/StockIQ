@@ -34,10 +34,10 @@ export function useWatchlist() {
     useEffect(() => {
         try {
             const stored = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-            if (stored) {
+            if (stored !== null) {
+                // 저장된 데이터가 있으면 (빈 배열 []도 유효한 상태로 인정)
                 const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    // 기존 데이터에 group이 없으면 0으로 설정
+                if (Array.isArray(parsed)) {
                     const migrated = parsed.map((item: WatchlistItem) => ({
                         ...item,
                         group: item.group ?? 0,
@@ -47,7 +47,7 @@ export function useWatchlist() {
                     setWatchlist(DEFAULT_WATCHLIST);
                 }
             } else {
-                // 이전 버전 데이터 마이그레이션
+                // localStorage에 키 자체가 없을 때만 이전 버전 마이그레이션 또는 기본값
                 const oldStored = localStorage.getItem('stockiq-watchlist');
                 if (oldStored) {
                     const oldParsed = JSON.parse(oldStored);
