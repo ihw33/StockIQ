@@ -8,7 +8,7 @@ import { ClassificationType } from '@/lib/types/stocks'
 import { Download, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-type SortField = 'symbol' | 'name' | 'market_cap' | 'per' | 'pbr' | 'roe' | 'eps' | 'cur_price' | 'volume' | 'change' | 'change_pct'
+type SortField = 'symbol' | 'name' | 'market_cap' | 'per' | 'pbr' | 'roe' | 'eps' | 'cur_price' | 'volume' | 'change' | 'change_pct' | 'revenue' | 'operating_profit_growth'
 type SortOrder = 'asc' | 'desc'
 
 // 장 시간 체크 (09:00 ~ 15:30 KST, 월~금)
@@ -46,6 +46,7 @@ export default function StocksBrowsePage() {
   const [batchUpdating, setBatchUpdating] = useState(false)
   const [batchId, setBatchId] = useState<string | null>(null)
   const [batchStatus, setBatchStatus] = useState<any>(null)
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
 
   const handleSectorClick = async (sectorName: string, sectorType: 'industry' | 'theme') => {
     setSelectedSector({ name: sectorName, type: sectorType })
@@ -308,6 +309,15 @@ export default function StocksBrowsePage() {
   const formatPercent = (num: number | null | undefined): string => {
     if (num == null) return '-'
     return num.toFixed(2)
+  }
+
+  // 억/조 단위로 자동 변환
+  const formatAmount = (num: number | null | undefined): string => {
+    if (num == null || num === 0) return 'N/A'
+    if (num >= 10000) {
+      return `${(num / 10000).toFixed(1)}조`
+    }
+    return `${num.toLocaleString()}억`
   }
 
   const handleBackToList = () => {
@@ -663,13 +673,56 @@ export default function StocksBrowsePage() {
                             {sortField === 'roe' && <span className="text-gray-900">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
                           </div>
                         </th>
+                        <th onClick={() => handleSort('revenue')} className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors">
+                          <div className="flex flex-col items-end gap-0.5">
+                            <div className="flex items-center gap-1">
+                              매출액
+                              {sortField === 'revenue' && <span className="text-gray-900">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                            </div>
+                            {sortedStocks.length > 0 && sortedStocks[0].fiscal_period && (
+                              <span className="text-[10px] font-normal text-gray-500 normal-case">
+                                ({sortedStocks[0].fiscal_period})
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th onClick={() => handleSort('operating_profit_growth')} className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors">
+                          <div className="flex flex-col items-end gap-0.5">
+                            <div className="flex items-center gap-1">
+                              영업이익증가율
+                              {sortField === 'operating_profit_growth' && <span className="text-gray-900">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                            </div>
+                            <span className="text-[10px] font-normal text-gray-500 normal-case">
+                              (전년 동기 대비)
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleSort('pbr')} className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors">
+                          <div className="flex items-center justify-end gap-1">
+                            PBR
+                            {sortField === 'pbr' && <span className="text-gray-900">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                          </div>
+                        </th>
+                        <th onClick={() => handleSort('eps')} className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors">
+                          <div className="flex items-center justify-end gap-1">
+                            EPS
+                            {sortField === 'eps' && <span className="text-gray-900">{sortOrder === 'asc' ? '↑' : '↓'}</span>}
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {sortedStocks.map((stock) => (
                         <tr key={stock.symbol} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 text-sm text-gray-600 font-mono">{stock.symbol}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{stock.name}</td>
+                          <td className="px-4 py-3 text-sm font-medium">
+                            <a
+                              href={`/?stock=${stock.symbol}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                            >
+                              {stock.name}
+                            </a>
+                          </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
                               stock.market === 'KOSPI' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
@@ -686,9 +739,27 @@ export default function StocksBrowsePage() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">{formatNumber(stock.volume)}</td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">{formatNumber(stock.market_cap)} 억</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">{formatAmount(stock.market_cap)}</td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">{formatPercent(stock.per)}</td>
                           <td className="px-4 py-3 text-sm text-right text-gray-600">{formatPercent(stock.roe)}</td>
+                          <td className="px-4 py-3 text-sm text-right font-mono text-gray-900">
+                            {formatAmount(stock.revenue)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-mono text-gray-900">
+                            {stock.operating_profit_growth != null ? (
+                              <span className={stock.operating_profit_growth > 0 ? 'text-green-600 font-semibold' : stock.operating_profit_growth < 0 ? 'text-red-600' : ''}>
+                                {stock.operating_profit_growth > 0 ? '+' : ''}{stock.operating_profit_growth.toFixed(2)}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-mono text-gray-900">
+                            {stock.pbr ? stock.pbr.toFixed(2) : <span className="text-gray-400">N/A</span>}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-mono text-gray-900">
+                            {stock.eps ? `${stock.eps.toLocaleString()}원` : <span className="text-gray-400">N/A</span>}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -700,7 +771,7 @@ export default function StocksBrowsePage() {
         ) : activeTab === 'favorites' ? (
           <FavoritesView />
         ) : (
-          <ClassificationGrid type={activeTab} />
+          <ClassificationGrid type={activeTab} onSectorClick={handleSectorClick} />
         )}
       </div>
     </div>

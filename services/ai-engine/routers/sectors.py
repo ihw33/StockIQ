@@ -12,7 +12,6 @@ from datetime import datetime
 # collectors 경로 추가
 sys.path.append(str(Path(__file__).parent.parent))
 from collectors.naver_sector_scraper import get_sector_extremes
-from utils.market_calendar import is_market_open, get_market_status
 
 router = APIRouter(prefix="/api/sectors", tags=["sectors"])
 
@@ -90,17 +89,6 @@ async def fetch_sector_data() -> Dict[str, Any]:
     - 상승 Top 10
     - 하락 Top 10
     """
-    # 장 개장 여부 체크
-    if not is_market_open():
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
-        now = datetime.now(ZoneInfo('Asia/Seoul'))
-        return {
-            'success': False,
-            'message': f"장이 열리지 않는 시간입니다 (현재: {now.strftime('%Y-%m-%d %H:%M KST')})",
-            'data': None
-        }
-
     try:
         result = get_sector_extremes()
 

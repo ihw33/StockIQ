@@ -121,24 +121,19 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Header */}
-      <header className="border-b border-slate-800 px-6 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-          StockIQ
-        </h1>
-        <button
-          onClick={() => { loadMarket(); loadSectors(); loadNotes() }}
-          className="p-1.5 text-slate-500 hover:text-slate-300 transition-colors"
-          title="새로고침"
-        >
-          <RefreshCw size={15} />
-        </button>
-      </header>
-
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* 시장 현황 */}
         <section>
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">시장 현황</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">시장 현황</h2>
+            <button
+              onClick={() => { loadMarket(); loadSectors(); loadNotes() }}
+              className="p-1 text-slate-600 hover:text-slate-400 transition-colors"
+              title="새로고침"
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
           <div className="flex gap-3">
             {renderIndex('KOSPI', '코스피')}
             {renderIndex('KOSDAQ', '코스닥')}

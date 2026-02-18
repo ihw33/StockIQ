@@ -6,6 +6,10 @@ from bs4 import BeautifulSoup
 from typing import List, Dict
 import time
 import re
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.market_calendar import get_last_trading_day
 
 
 def scrape_rising_stocks(limit: int = 50) -> List[Dict]:
@@ -189,7 +193,7 @@ def get_stocks_extremes(limit: int = 50) -> Dict:
     falling = scrape_falling_stocks(limit)
 
     return {
-        'market_date': time.strftime('%Y-%m-%d'),
+        'market_date': get_last_trading_day().strftime('%Y-%m-%d'),  # 마지막 거래일
         'fetched_at': time.strftime('%Y-%m-%d %H:%M:%S'),
         'rising': {
             'count': len(rising),

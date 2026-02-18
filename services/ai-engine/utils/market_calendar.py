@@ -4,7 +4,7 @@
 - 한국 공휴일 체크 (holidays 라이브러리)
 - 장 시간 체크 (09:00~15:30 KST)
 """
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 import holidays
 
@@ -72,6 +72,24 @@ def get_holiday_name(target_date: date) -> str | None:
 
     kr_holidays = get_kr_holidays(target_date.year)
     return kr_holidays.get(target_date)
+
+
+def get_last_trading_day(from_date: date = None) -> date:
+    """
+    가장 최근 거래일 반환 (from_date 포함)
+    - 오늘이 거래일이면 오늘
+    - 오늘이 휴일/주말이면 이전 거래일 탐색
+    """
+    if from_date is None:
+        from_date = datetime.now(KST).date()
+
+    d = from_date
+    for _ in range(10):  # 최대 10일 전까지 탐색 (연휴 대비)
+        if is_trading_day(d):
+            return d
+        d -= timedelta(days=1)
+
+    return from_date  # fallback
 
 
 def get_market_status(target_date: date = None) -> dict:

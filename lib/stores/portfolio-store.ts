@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type Broker = 'kiwoom' | 'toss' | 'manual';
+
 export interface Position {
     symbol: string;
     symbolName: string;
@@ -10,6 +12,7 @@ export interface Position {
     profitRate: number;    // 수익률 (%)
     profitAmount: number;  // 수익금액
     totalValue: number;    // 총 평가금액
+    broker: Broker;        // 증권사 (kiwoom | toss | manual)
 }
 
 interface PortfolioState {
@@ -17,7 +20,7 @@ interface PortfolioState {
     lastSyncedAt: string | null;
 
     // Actions
-    addPosition: (pos: { symbol: string; symbolName: string; avgPrice: number; quantity: number }) => void;
+    addPosition: (pos: { symbol: string; symbolName: string; avgPrice: number; quantity: number; broker?: Broker }) => void;
     updatePosition: (symbol: string, updates: { avgPrice?: number; quantity?: number }) => void;
     removePosition: (symbol: string) => void;
     updateCurrentPrice: (symbol: string, price: number) => void;
@@ -46,8 +49,8 @@ export const usePortfolioStore = create<PortfolioState>()(
                         profitRate: 0,
                         profitAmount: 0,
                         totalValue,
+                        broker: pos.broker ?? 'manual',
                     };
-                    // 같은 symbol이 있으면 덮어쓰기
                     const filtered = state.positions.filter((p) => p.symbol !== pos.symbol);
                     return { positions: [...filtered, newPosition] };
                 });
@@ -110,7 +113,7 @@ export const usePortfolioStore = create<PortfolioState>()(
                     const res = await fetch('/api/portfolio/holdings');
                     if (!res.ok) return false;
                     const data = await res.json();
-                    const holdings: Position[] = (data.holdings || []).map((h: any) => ({
+                    const kiwoomPositions: Position[] = (data.holdings || []).map((h: any) => ({
                         symbol: h.symbol,
                         symbolName: h.symbolName,
                         avgPrice: h.avgPrice,
@@ -119,8 +122,11 @@ export const usePortfolioStore = create<PortfolioState>()(
                         profitRate: h.profitRate,
                         profitAmount: h.profitAmount,
                         totalValue: h.totalValue,
+                        broker: 'kiwoom' as Broker,
                     }));
-                    set({ positions: holdings, lastSyncedAt: new Date().toISOString() });
+                    // 키움이 아닌 종목(토스/수동)은 유지, 키움 종목만 교체
+                    const nonKiwoom = get().positions.filter(p => p.broker !== 'kiwoom');
+                    set({ positions: [...kiwoomPositions, ...nonKiwoom], lastSyncedAt: new Date().toISOString() });
                     return true;
                 } catch {
                     return false;
@@ -129,14 +135,16 @@ export const usePortfolioStore = create<PortfolioState>()(
         }),
         {
             name: 'portfolio-storage',
-            version: 2,
+            version: 3,
             migrate: (persistedState: unknown, version: number) => {
                 const state = persistedState as Record<string, unknown>;
-                if (version < 2) {
-                    // 기존 trades 기반 데이터 → positions만 유지, trades 제거
-                    return {
-                        positions: (state.positions as Position[]) || [],
-                    };
+                // v2 → v3: broker 필드 추가 (기존 포지션은 kiwoom으로 간주)
+                if (version < 3) {
+                    const positions = ((state.positions as Position[]) || []).map(p => ({
+                        ...p,
+                        broker: (p.broker ?? 'kiwoom') as Broker,
+                    }));
+                    return { ...state, positions };
                 }
                 return state as unknown as PortfolioState;
             },

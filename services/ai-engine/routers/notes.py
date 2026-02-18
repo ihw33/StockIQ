@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 import asyncpg
 import os
@@ -35,6 +35,7 @@ class TradeNoteCreate(BaseModel):
     result_summary: Optional[str] = None
     status: Optional[str] = "hold"          # hold | closed | watch
     profit_pct: Optional[float] = None
+    watch_data: Optional[Dict[str, Any]] = None   # 관심 종목 구조화 데이터 (JSON)
 
 
 class TradeNoteUpdate(BaseModel):
@@ -55,6 +56,7 @@ class TradeNoteUpdate(BaseModel):
     result_summary: Optional[str] = None
     status: Optional[str] = None
     profit_pct: Optional[float] = None
+    watch_data: Optional[Dict[str, Any]] = None
 
 
 def row_to_dict(row):
@@ -109,21 +111,23 @@ async def create_note(note: TradeNoteCreate):
     """매매 노트 생성"""
     conn = await get_conn()
     try:
+        import json as _json
+        watch_data_str = _json.dumps(note.watch_data) if note.watch_data else None
         row = await conn.fetchrow("""
             INSERT INTO trade_notes (
                 symbol, stock_name, trade_date, trade_type, price, quantity, portfolio_pct,
                 buy_reason, target_price, stop_loss, add_buy_plan, market_context,
-                review, psychology, result_summary, status, profit_pct
+                review, psychology, result_summary, status, profit_pct, watch_data
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7,
                 $8, $9, $10, $11, $12,
-                $13, $14, $15, $16, $17
+                $13, $14, $15, $16, $17, $18::jsonb
             ) RETURNING *
         """,
             note.symbol, note.stock_name, note.trade_date, note.trade_type,
             note.price, note.quantity, note.portfolio_pct,
             note.buy_reason, note.target_price, note.stop_loss, note.add_buy_plan, note.market_context,
-            note.review, note.psychology, note.result_summary, note.status, note.profit_pct
+            note.review, note.psychology, note.result_summary, note.status, note.profit_pct, watch_data_str
         )
         return row_to_dict(row)
     finally:
@@ -141,6 +145,7 @@ async def update_note(note_id: int, note: TradeNoteUpdate):
             raise HTTPException(status_code=404, detail="Note not found")
 
         # 변경된 필드만 업데이트
+        import json as _json
         data = note.model_dump(exclude_none=True)
         if not data:
             return row_to_dict(existing)
@@ -148,8 +153,12 @@ async def update_note(note_id: int, note: TradeNoteUpdate):
         set_clauses = []
         values = []
         for i, (k, v) in enumerate(data.items(), start=1):
-            set_clauses.append(f"{k} = ${i}")
-            values.append(v)
+            if k == 'watch_data' and isinstance(v, dict):
+                set_clauses.append(f"{k} = ${i}::jsonb")
+                values.append(_json.dumps(v))
+            else:
+                set_clauses.append(f"{k} = ${i}")
+                values.append(v)
 
         set_clauses.append(f"updated_at = ${len(values)+1}")
         values.append(datetime.now())

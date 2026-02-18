@@ -5,6 +5,10 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict
 import time
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.market_calendar import get_last_trading_day
 
 def scrape_industries() -> List[Dict]:
     """업종별 시세 크롤링"""
@@ -144,7 +148,7 @@ def get_sector_extremes() -> Dict:
     print(f"✅ 크롤링 완료: 업종 {len(industries)}개, 테마 {len(themes)}개")
 
     return {
-        'market_date': time.strftime('%Y-%m-%d'),  # 시장 데이터 날짜
+        'market_date': get_last_trading_day().strftime('%Y-%m-%d'),  # 마지막 거래일
         'fetched_at': time.strftime('%Y-%m-%d %H:%M:%S'),  # 실제 가져온 시간
         'total_sectors': len(industries) + len(themes),
         'industries': {
