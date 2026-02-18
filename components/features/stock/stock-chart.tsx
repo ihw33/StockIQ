@@ -202,8 +202,8 @@ export function StockChart({
         return sliced.map(d => ({ ...d, domainMin, domainMax }));
     }, [processedData, range]);
 
-    if (!data) return <div className="flex items-center justify-center h-full text-gray-500 text-xs bg-[#1e1e1e]">차트 데이터 대기 중...</div>;
-    if (data.length === 0) return <div className="flex items-center justify-center h-full text-gray-400 text-xs bg-[#1e1e1e]">데이터가 없습니다 (Symbol 확인 필요).</div>;
+    if (!data) return <div className="flex items-center justify-center h-full text-gray-500 text-xs bg-white">차트 데이터 대기 중...</div>;
+    if (data.length === 0) return <div className="flex items-center justify-center h-full text-gray-400 text-xs bg-white">데이터가 없습니다 (Symbol 확인 필요).</div>;
 
     const domainMin = visibleData[0]?.domainMin;
     const domainMax = visibleData[0]?.domainMax;
@@ -313,13 +313,13 @@ export function StockChart({
 
     return (
         <div
-            className="flex flex-col w-full h-full relative select-none bg-[#1e1e1e]" // Darker BG like HTS
+            className="flex flex-col w-full h-full relative select-none bg-white" // Darker BG like HTS
             style={{ minHeight: height === '100%' ? 0 : (typeof height === 'number' ? height : 400) }}
             onWheel={handleWheel}
         >
             {/* HTS Style Header Info Bar */}
             {headerData && (
-                <div className="flex items-center space-x-4 px-2 py-1 text-xs border-b border-gray-800 bg-[#252526] text-gray-300 font-mono">
+                <div className="flex items-center space-x-4 px-2 py-1 text-xs border-b border-gray-200 bg-gray-50 text-gray-700 font-mono">
                     <span className="text-gray-400">{headerData.timestamp}</span>
                     <div className="flex space-x-1">
                         <span className="text-gray-500">시</span>
@@ -342,7 +342,7 @@ export function StockChart({
                     </div>
 
                     {/* MA Values Header */}
-                    <div className="flex space-x-3 ml-4 border-l border-gray-700 pl-4 hidden sm:flex">
+                    <div className="flex space-x-3 ml-4 border-l border-gray-200 pl-4 hidden sm:flex">
                         <span className="text-[#60a5fa]">5: {headerData.ma5 ? fmtNum(headerData.ma5) : '-'}</span>
                         <span className="text-[#2563eb] font-bold">20: {headerData.ma20 ? fmtNum(headerData.ma20) : '-'}</span>
                         <span className="text-[#60a5fa]">60: {headerData.ma60 ? fmtNum(headerData.ma60) : '-'}</span>
@@ -351,7 +351,7 @@ export function StockChart({
 
                     <div className="flex space-x-1 ml-auto">
                         <span className="text-gray-500">거래량</span>
-                        <span className="text-white">{fmtNum(headerData.volume)}</span>
+                        <span className="text-gray-800">{fmtNum(headerData.volume)}</span>
                     </div>
                 </div>
             )}
@@ -360,14 +360,14 @@ export function StockChart({
             <div className="absolute top-10 right-14 z-20 flex flex-col gap-1">
                 <button
                     onClick={handleZoomIn}
-                    className="w-6 h-6 bg-gray-700/80 hover:bg-gray-600 text-white rounded flex items-center justify-center text-lg leading-none border border-gray-600"
+                    className="w-6 h-6 bg-white hover:bg-gray-100 text-gray-700 rounded flex items-center justify-center text-lg leading-none border border-gray-200"
                     title="확대 (최근 기준)"
                 >
                     +
                 </button>
                 <button
                     onClick={handleZoomOut}
-                    className="w-6 h-6 bg-gray-700/80 hover:bg-gray-600 text-white rounded flex items-center justify-center text-lg leading-none border border-gray-600"
+                    className="w-6 h-6 bg-white hover:bg-gray-100 text-gray-700 rounded flex items-center justify-center text-lg leading-none border border-gray-200"
                     title="축소 (최근 기준)"
                 >
                     -
@@ -393,16 +393,16 @@ export function StockChart({
                         syncId="stockChartSync"
                     >
                         {/* HTS Style Grid */}
-                        <CartesianGrid stroke="#333" strokeDasharray="3 3" vertical={true} horizontal={true} />
+                        <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" vertical={true} horizontal={true} />
 
                         <YAxis
                             yAxisId="price"
                             width={55}
                             domain={[domainMin, domainMax]}
                             orientation="right"
-                            tick={{ fontSize: 11, fill: '#9ca3af' }}
+                            tick={{ fontSize: 11, fill: '#6b7280' }}
                             tickFormatter={(val) => new Intl.NumberFormat('en-US').format(val)}
-                            stroke="#374151"
+                            stroke="#d1d5db"
                             tickCount={8}
                         />
                         <XAxis dataKey="timestamp" hide={true} />
@@ -474,27 +474,27 @@ export function StockChart({
 
                 {/* Y-Axis Price Badge */}
                 {focusData && (
-                    <div className="absolute right-0 bg-gray-700 text-white text-[11px] px-1 py-0.5 rounded-l-sm pointer-events-none transform -translate-y-1/2 z-10 font-mono" style={{ top: focusData.y }}>
+                    <div className="absolute right-0 bg-gray-800 text-white text-[11px] px-1 py-0.5 rounded-l-sm pointer-events-none transform -translate-y-1/2 z-10 font-mono" style={{ top: focusData.y }}>
                         {new Intl.NumberFormat('en-US').format(Math.round(focusData.price))}
                     </div>
                 )}
             </div>
 
             {/* VOLUME & NAVIGATOR (Always Visible) */}
-            <div className="h-[80px] border-t border-gray-700 relative bg-[#1e1e1e]">
+            <div className="h-[80px] border-t border-gray-200 relative bg-white">
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
                         data={visibleData} // Use visibleData for Volume Bars
                         margin={{ top: 5, right: 0, bottom: 5, left: 0 }}
                         syncId="stockChartSync"
                     >
-                        <CartesianGrid stroke="#333" strokeDasharray="3 3" vertical={true} horizontal={false} />
-                        <YAxis yAxisId="volume" width={55} orientation="right" tick={{ fontSize: 10, fill: '#6b7280' }} stroke="#374151" tickFormatter={(val) => new Intl.NumberFormat('en-US', { notation: "compact" }).format(val)} />
+                        <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" vertical={true} horizontal={false} />
+                        <YAxis yAxisId="volume" width={55} orientation="right" tick={{ fontSize: 10, fill: '#6b7280' }} stroke="#d1d5db" tickFormatter={(val) => new Intl.NumberFormat('en-US', { notation: "compact" }).format(val)} />
                         <XAxis
                             dataKey="timestamp"
                             hide={showMACD || showRSI}
-                            stroke="#374151"
-                            tick={{ fontSize: 10, fill: '#9ca3af' }}
+                            stroke="#d1d5db"
+                            tick={{ fontSize: 10, fill: '#6b7280' }}
                             tickFormatter={formatXAxis}
                             minTickGap={30}
                         />
@@ -518,15 +518,15 @@ export function StockChart({
             </div>
 
             {/* NAVIGATOR */}
-            <div className="h-[30px] border-t border-gray-800 bg-[#121212]">
+            <div className="h-[30px] border-t border-gray-200 bg-gray-100">
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={processedData} margin={{ top: 0, left: 0, bottom: 0, right: 0 }}>
-                        <Bar dataKey="close" fill="#333" isAnimationActive={false} />
+                        <Bar dataKey="close" fill="#cbd5e1" isAnimationActive={false} />
                         <Brush
                             dataKey="timestamp"
                             height={30}
-                            stroke="#555"
-                            fill="#222"
+                            stroke="#d1d5db"
+                            fill="#f8fafc"
                             tickFormatter={() => ""}
                             onChange={handleBrushChange}
                             startIndex={range.startIndex}
@@ -539,16 +539,16 @@ export function StockChart({
 
             {/* MACD SUB-CHART */}
             {showMACD && (
-                <div className="h-[100px] border-t border-gray-700 relative">
+                <div className="h-[100px] border-t border-gray-200 relative">
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                             data={visibleData}
                             margin={{ top: 5, right: 0, bottom: 5, left: 0 }}
                             syncId="stockChartSync"
                         >
-                            <CartesianGrid stroke="#333" strokeDasharray="3 3" />
-                            <YAxis width={55} orientation="right" tick={{ fontSize: 10, fill: '#6b7280' }} stroke="#374151" />
-                            <XAxis dataKey="timestamp" hide={showRSI} stroke="#374151" tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={formatXAxis} minTickGap={30} />
+                            <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                            <YAxis width={55} orientation="right" tick={{ fontSize: 10, fill: '#6b7280' }} stroke="#d1d5db" />
+                            <XAxis dataKey="timestamp" hide={showRSI} stroke="#d1d5db" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatXAxis} minTickGap={30} />
                             <Tooltip content={<></>} cursor={false} />
 
                             <Bar dataKey="macd.histogram" fill="#9ca3af" barSize={2}>
@@ -571,16 +571,16 @@ export function StockChart({
 
             {/* RSI SUB-CHART */}
             {showRSI && (
-                <div className="h-[100px] border-t border-gray-700 relative">
+                <div className="h-[100px] border-t border-gray-200 relative">
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                             data={visibleData}
                             margin={{ top: 5, right: 0, bottom: 5, left: 0 }}
                             syncId="stockChartSync"
                         >
-                            <CartesianGrid stroke="#333" strokeDasharray="3 3" />
-                            <YAxis width={55} orientation="right" tick={{ fontSize: 10, fill: '#6b7280' }} domain={[0, 100]} ticks={[30, 70]} stroke="#374151" />
-                            <XAxis dataKey="timestamp" stroke="#374151" tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={formatXAxis} minTickGap={30} />
+                            <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                            <YAxis width={55} orientation="right" tick={{ fontSize: 10, fill: '#6b7280' }} domain={[0, 100]} ticks={[30, 70]} stroke="#d1d5db" />
+                            <XAxis dataKey="timestamp" stroke="#d1d5db" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatXAxis} minTickGap={30} />
                             <Tooltip content={<></>} cursor={false} />
 
                             <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" />

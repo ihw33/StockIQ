@@ -63,29 +63,38 @@ def row_to_dict(row):
     """asyncpg Record → dict 변환"""
     if row is None:
         return None
+    import json as _json
     d = dict(row)
-    # date/datetime 직렬화
     for k, v in d.items():
         if isinstance(v, (date, datetime)):
             d[k] = v.isoformat()
+        elif k == 'watch_data' and isinstance(v, str):
+            try:
+                d[k] = _json.loads(v)
+            except Exception:
+                pass
     return d
 
 
 @router.get("/api/notes")
-async def list_notes(status: Optional[str] = None, limit: int = 50, offset: int = 0):
+async def list_notes(symbol: Optional[str] = None, status: Optional[str] = None, limit: int = 50, offset: int = 0):
     """매매 노트 목록 조회"""
     conn = await get_conn()
     try:
+        conditions = []
+        params: list = []
+        if symbol:
+            params.append(symbol)
+            conditions.append(f"symbol = ${len(params)}")
         if status:
-            rows = await conn.fetch(
-                "SELECT * FROM trade_notes WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-                status, limit, offset
-            )
-        else:
-            rows = await conn.fetch(
-                "SELECT * FROM trade_notes ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-                limit, offset
-            )
+            params.append(status)
+            conditions.append(f"status = ${len(params)}")
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        params.extend([limit, offset])
+        rows = await conn.fetch(
+            f"SELECT * FROM trade_notes {where} ORDER BY created_at DESC LIMIT ${len(params)-1} OFFSET ${len(params)}",
+            *params
+        )
         return [row_to_dict(r) for r in rows]
     finally:
         await conn.close()
