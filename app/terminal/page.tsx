@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, ReferenceLine } from "recharts";
 import { UnifiedSidebar } from "@/components/features/sidebar/unified-sidebar";
 import { AccountStatus } from "@/components/features/stock/account-status";
 import { StockSearchModal } from "@/components/features/stock/stock-search-modal";
@@ -90,6 +90,7 @@ function pctStr(n: number) { return `${n > 0 ? '+' : ''}${n.toFixed(1)}%`; }
 function SimpleChart({ symbol, name }: { symbol: string; name: string }) {
     const [quote, setQuote] = useState<StockQuote | null>(null);
     const [chartData, setChartData] = useState<ChartPoint[]>([]);
+    const [avgPrice, setAvgPrice] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -98,18 +99,23 @@ function SimpleChart({ symbol, name }: { symbol: string; name: string }) {
         Promise.all([
             fetch(`/api/stock/quote?symbol=${symbol}`).then(r => r.ok ? r.json() : null),
             fetch(`/api/stock/chart?symbol=${symbol}&interval=D`).then(r => r.ok ? r.json() : []),
-        ]).then(([q, c]) => {
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/notes?symbol=${symbol}&status=hold`).then(r => r.ok ? r.json() : []),
+        ]).then(([q, c, notes]) => {
             if (ignore) return;
             if (q) setQuote(q);
             setChartData(Array.isArray(c) ? c.slice(-120) : []);
+            const holdNote = Array.isArray(notes) && notes.length > 0 ? notes[0] : null;
+            setAvgPrice(holdNote?.price ?? null);
         }).catch(() => { }).finally(() => { if (!ignore) setLoading(false); });
         return () => { ignore = true; };
     }, [symbol]);
 
     const isUp = (quote?.change ?? 0) >= 0;
     const color = isUp ? '#ef4444' : '#3b82f6';
-    const minVal = chartData.length > 0 ? Math.min(...chartData.map(d => d.close)) * 0.998 : 0;
-    const maxVal = chartData.length > 0 ? Math.max(...chartData.map(d => d.close)) * 1.002 : 0;
+    const prices = chartData.map(d => d.close);
+    if (avgPrice) prices.push(avgPrice);
+    const minVal = prices.length > 0 ? Math.min(...prices) * 0.998 : 0;
+    const maxVal = prices.length > 0 ? Math.max(...prices) * 1.002 : 0;
 
     return (
         <div className="flex flex-col h-full">
@@ -180,6 +186,15 @@ function SimpleChart({ symbol, name }: { symbol: string; name: string }) {
                                 dot={false}
                                 isAnimationActive={false}
                             />
+                            {avgPrice && (
+                                <ReferenceLine
+                                    y={avgPrice}
+                                    stroke="#f59e0b"
+                                    strokeDasharray="4 3"
+                                    strokeWidth={1.5}
+                                    label={{ value: `평단 ₩${fmtNum(avgPrice)}`, position: 'left', fontSize: 10, fill: '#f59e0b', fontWeight: 600 }}
+                                />
+                            )}
                         </AreaChart>
                     </ResponsiveContainer>
                 ) : (

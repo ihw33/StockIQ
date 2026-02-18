@@ -155,12 +155,19 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
   }
 
   const update = (k: string, v: unknown) => setForm(prev => ({ ...prev, [k]: v }))
+  const updateEP = (k: string, v: unknown) => setForm(prev => ({
+    ...prev,
+    watch_data: {
+      ...(prev.watch_data || {}),
+      exit_plan: { ...((prev.watch_data as WatchData)?.exit_plan || {}), [k]: v }
+    }
+  }))
 
   if (loading) return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">불러오는 중...</div>
   if (!note) return null
 
   const n = editing ? form : note
-  const ep = note.watch_data?.exit_plan
+  const ep = n.watch_data?.exit_plan
   const memos = note.watch_data?.memos || []
 
   return (
@@ -224,19 +231,23 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
               {/* 기준가 / 목표가 */}
               {(ep.base_price || ep.target_price) && (
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  {ep.base_price && (
+                  {(ep.base_price || editing) && (
                     <div>
                       <p className="text-xs text-slate-500 mb-0.5">기준 주가</p>
-                      <p className="text-sm text-slate-300 font-mono">{fmt(ep.base_price)}</p>
+                      {editing ? <input type="number" defaultValue={ep.base_price || ''} onChange={e => updateEP('base_price', parseFloat(e.target.value) || null)}
+                        className="w-full px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-slate-200 outline-none focus:border-amber-500 font-mono" />
+                      : <p className="text-sm text-slate-300 font-mono">{fmt(ep.base_price)}</p>}
                     </div>
                   )}
-                  {ep.target_price && (
+                  {(ep.target_price || editing) && (
                     <div>
                       <p className="text-xs text-slate-500 mb-0.5">목표 주가</p>
-                      <p className="text-sm font-bold text-emerald-400 font-mono">
-                        {fmt(ep.target_price)}
-                        {ep.target_pct != null && <span className="text-xs ml-1 text-emerald-500">+{ep.target_pct}%</span>}
-                      </p>
+                      {editing ? <input type="number" defaultValue={ep.target_price || ''} onChange={e => updateEP('target_price', parseFloat(e.target.value) || null)}
+                        className="w-full px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-emerald-400 outline-none focus:border-amber-500 font-mono font-bold" />
+                      : <p className="text-sm font-bold text-emerald-400 font-mono">
+                          {fmt(ep.target_price)}
+                          {ep.target_pct != null && <span className="text-xs ml-1 text-emerald-500">+{ep.target_pct}%</span>}
+                        </p>}
                     </div>
                   )}
                 </div>
@@ -254,8 +265,10 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
                           {ep.p1_sell && <span className="text-[10px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">매도 {ep.p1_sell}%</span>}
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-mono font-medium text-emerald-400">{fmt(ep.p1_price)}</span>
-                          {ep.p1_pct != null && <span className="text-xs text-emerald-600 ml-1.5">+{ep.p1_pct}%</span>}
+                          {editing ? <input type="number" defaultValue={ep.p1_price || ''} onChange={e => updateEP('p1_price', parseFloat(e.target.value) || null)}
+                            className="w-24 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-emerald-400 outline-none focus:border-amber-500 font-mono text-right" />
+                          : <><span className="text-sm font-mono font-medium text-emerald-400">{fmt(ep.p1_price)}</span>
+                            {ep.p1_pct != null && <span className="text-xs text-emerald-600 ml-1.5">+{ep.p1_pct}%</span>}</>}
                         </div>
                       </div>
                     )}
@@ -266,8 +279,10 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
                           {ep.p2_sell && <span className="text-[10px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">매도 {ep.p2_sell}%</span>}
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-mono font-medium text-emerald-400">{fmt(ep.p2_price)}</span>
-                          {ep.p2_pct != null && <span className="text-xs text-emerald-600 ml-1.5">+{ep.p2_pct}%</span>}
+                          {editing ? <input type="number" defaultValue={ep.p2_price || ''} onChange={e => updateEP('p2_price', parseFloat(e.target.value) || null)}
+                            className="w-24 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-emerald-400 outline-none focus:border-amber-500 font-mono text-right" />
+                          : <><span className="text-sm font-mono font-medium text-emerald-400">{fmt(ep.p2_price)}</span>
+                            {ep.p2_pct != null && <span className="text-xs text-emerald-600 ml-1.5">+{ep.p2_pct}%</span>}</>}
                         </div>
                       </div>
                     )}
@@ -282,8 +297,10 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
                   <div className="flex items-center justify-between bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
                     <span className="text-xs text-slate-400">손절가</span>
                     <div className="text-right">
-                      <span className="text-sm font-mono font-medium text-red-400">{fmt(ep.sl_price)}</span>
-                      {ep.sl_pct != null && <span className="text-xs text-red-600 ml-1.5">{ep.sl_pct}%</span>}
+                      {editing ? <input type="number" defaultValue={ep.sl_price || ''} onChange={e => updateEP('sl_price', parseFloat(e.target.value) || null)}
+                        className="w-24 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-red-400 outline-none focus:border-amber-500 font-mono text-right" />
+                      : <><span className="text-sm font-mono font-medium text-red-400">{fmt(ep.sl_price)}</span>
+                        {ep.sl_pct != null && <span className="text-xs text-red-600 ml-1.5">{ep.sl_pct}%</span>}</>}
                     </div>
                   </div>
                   {ep.sl_note && <p className="text-xs text-slate-500 mt-1.5 pl-1">{ep.sl_note}</p>}
@@ -302,8 +319,10 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
                           {ep.a1_weight && <span className="text-[10px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">비중 {ep.a1_weight}%</span>}
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-mono font-medium text-amber-400">{fmt(ep.a1_price)}</span>
-                          {ep.a1_pct != null && <span className="text-xs text-amber-600 ml-1.5">{ep.a1_pct}%</span>}
+                          {editing ? <input type="number" defaultValue={ep.a1_price || ''} onChange={e => updateEP('a1_price', parseFloat(e.target.value) || null)}
+                            className="w-24 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-amber-400 outline-none focus:border-amber-500 font-mono text-right" />
+                          : <><span className="text-sm font-mono font-medium text-amber-400">{fmt(ep.a1_price)}</span>
+                            {ep.a1_pct != null && <span className="text-xs text-amber-600 ml-1.5">{ep.a1_pct}%</span>}</>}
                         </div>
                       </div>
                     )}
@@ -314,8 +333,10 @@ export default function NoteDetailPage({ params }: { params: { id: string } }) {
                           {ep.a2_weight && <span className="text-[10px] text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded">비중 {ep.a2_weight}%</span>}
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-mono font-medium text-amber-400">{fmt(ep.a2_price)}</span>
-                          {ep.a2_pct != null && <span className="text-xs text-amber-600 ml-1.5">{ep.a2_pct}%</span>}
+                          {editing ? <input type="number" defaultValue={ep.a2_price || ''} onChange={e => updateEP('a2_price', parseFloat(e.target.value) || null)}
+                            className="w-24 px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-sm text-amber-400 outline-none focus:border-amber-500 font-mono text-right" />
+                          : <><span className="text-sm font-mono font-medium text-amber-400">{fmt(ep.a2_price)}</span>
+                            {ep.a2_pct != null && <span className="text-xs text-amber-600 ml-1.5">{ep.a2_pct}%</span>}</>}
                         </div>
                       </div>
                     )}
