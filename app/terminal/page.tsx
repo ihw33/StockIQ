@@ -99,11 +99,17 @@ function SimpleChart({ symbol, name }: { symbol: string; name: string }) {
         Promise.all([
             fetch(`/api/stock/quote?symbol=${symbol}`).then(r => r.ok ? r.json() : null),
             fetch(`/api/stock/chart?symbol=${symbol}&interval=D`).then(r => r.ok ? r.json() : []),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/notes?symbol=${symbol}&status=hold`).then(r => r.ok ? r.json() : []),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/notes?symbol=${symbol}&status=hold`).then(r => r.ok ? r.json() : []).catch(() => []),
         ]).then(([q, c, notes]) => {
             if (ignore) return;
+            const chartArr = Array.isArray(c) ? c.slice(-120) : [];
+            if (q && q.price === 0 && chartArr.length > 0) {
+                const last = chartArr[chartArr.length - 1];
+                q.price = last.close;
+                q.volume = last.volume || 0;
+            }
             if (q) setQuote(q);
-            setChartData(Array.isArray(c) ? c.slice(-120) : []);
+            setChartData(chartArr);
             const holdNote = Array.isArray(notes) && notes.length > 0 ? notes[0] : null;
             setAvgPrice(holdNote?.price ?? null);
         }).catch(() => { }).finally(() => { if (!ignore) setLoading(false); });

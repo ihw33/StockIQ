@@ -43,15 +43,18 @@ def scrape_industries() -> List[Dict]:
 
             name = name_tag.text.strip()
 
-            # 등락률
-            change_text = cols[2].text.strip()
+            if name == '기타':
+                continue
+
+            # 등락률 (col[1])
+            change_text = cols[1].text.strip()
             try:
-                change_pct = float(change_text.replace('%', '').replace(',', ''))
+                change_pct = float(change_text.replace('%', '').replace(',', '').replace('+', ''))
             except:
                 continue
 
             # 거래대금
-            volume_text = cols[3].text.strip()
+            volume_text = cols[3].text.strip() if len(cols) > 3 else ''
 
             industries.append({
                 'name': name,
@@ -100,15 +103,15 @@ def scrape_themes() -> List[Dict]:
 
             name = name_tag.text.strip()
 
-            # 등락률
-            change_text = cols[2].text.strip()
+            # 등락률 (col[1])
+            change_text = cols[1].text.strip()
             try:
-                change_pct = float(change_text.replace('%', '').replace(',', ''))
+                change_pct = float(change_text.replace('%', '').replace(',', '').replace('+', ''))
             except:
                 continue
 
             # 거래대금
-            volume_text = cols[3].text.strip()
+            volume_text = cols[3].text.strip() if len(cols) > 3 else ''
 
             themes.append({
                 'name': name,

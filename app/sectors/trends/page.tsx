@@ -137,14 +137,27 @@ export default function SectorTrendsPage() {
     }
   }
 
-  // 가장 자주 나타나는 섹터 (빈도 분석)
+  // 최신 날짜의 당일 순위 (일간용)
+  const getLatestDayRanking = (direction: 'up' | 'down', type: 'industries' | 'themes') => {
+    if (dates.length === 0) return []
+    const latest = dates[0] // 가장 최근 날짜
+    const sectors = historyData[latest]?.[type]?.[direction] || []
+    return sectors
+      .filter(s => s.name !== '기타')
+      .sort((a, b) => direction === 'up' ? b.change_pct - a.change_pct : a.change_pct - b.change_pct)
+      .slice(0, 10)
+  }
+
+  // 가장 자주 나타나는 섹터 (빈도 분석 - 분기/연간용)
   const getTopFrequentSectors = (direction: 'up' | 'down', type: 'industries' | 'themes') => {
     const frequency: Record<string, number> = {}
 
     dates.forEach(date => {
       const sectors = historyData[date]?.[type]?.[direction] || []
       sectors.forEach(sector => {
-        frequency[sector.name] = (frequency[sector.name] || 0) + 1
+        if (sector.name !== '기타') {
+          frequency[sector.name] = (frequency[sector.name] || 0) + 1
+        }
       })
     })
 
@@ -561,94 +574,166 @@ export default function SectorTrendsPage() {
               </div>
             ) : (
               <>
-                {/* 빈도 분석 (일간/월간/분기/연간) */}
-                {sectorType !== 'theme' && (
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg p-6 shadow-sm border">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-red-600" />
-                    업종 상승 빈도 Top 10
-                    <span className="text-sm text-gray-500 font-normal">
-                      (최근 {dates.length}일)
-                    </span>
-                  </h3>
-                  <div className="space-y-2">
-                    {getTopFrequentSectors('up', 'industries').map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <Link href={`/stocks/browse/industry/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
-                          {idx + 1}. {item.name}
-                        </Link>
-                        <span className="font-semibold text-red-600">{item.count}회</span>
+                {/* 일간: 당일 순위 / 분기·연간: 빈도 분석 */}
+                {timeRange === 'daily' ? (
+                  <>
+                    {sectorType !== 'theme' && (
+                      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-red-600" />
+                            업종 상승 Top 10
+                            <span className="text-sm text-gray-500 font-normal">({dates[0]})</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getLatestDayRanking('up', 'industries').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/industry/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-red-600">+{item.change_pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingDown className="w-5 h-5 text-blue-600" />
+                            업종 하락 Top 10
+                            <span className="text-sm text-gray-500 font-normal">({dates[0]})</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getLatestDayRanking('down', 'industries').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/industry/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-blue-600">{item.change_pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg p-6 shadow-sm border">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <TrendingDown className="w-5 h-5 text-blue-600" />
-                    업종 하락 빈도 Top 10
-                    <span className="text-sm text-gray-500 font-normal">
-                      (최근 {dates.length}일)
-                    </span>
-                  </h3>
-                  <div className="space-y-2">
-                    {getTopFrequentSectors('down', 'industries').map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <Link href={`/stocks/browse/industry/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
-                          {idx + 1}. {item.name}
-                        </Link>
-                        <span className="font-semibold text-blue-600">{item.count}회</span>
+                    )}
+                    {sectorType !== 'industry' && (
+                      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-red-600" />
+                            테마 상승 Top 10
+                            <span className="text-sm text-gray-500 font-normal">({dates[0]})</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getLatestDayRanking('up', 'themes').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/theme/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-red-600">+{item.change_pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingDown className="w-5 h-5 text-blue-600" />
+                            테마 하락 Top 10
+                            <span className="text-sm text-gray-500 font-normal">({dates[0]})</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getLatestDayRanking('down', 'themes').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/theme/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-blue-600">{item.change_pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {sectorType !== 'industry' && (
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg p-6 shadow-sm border">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-red-600" />
-                    테마 상승 빈도 Top 10
-                    <span className="text-sm text-gray-500 font-normal">
-                      (최근 {dates.length}일)
-                    </span>
-                  </h3>
-                  <div className="space-y-2">
-                    {getTopFrequentSectors('up', 'themes').map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <Link href={`/stocks/browse/theme/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
-                          {idx + 1}. {item.name}
-                        </Link>
-                        <span className="font-semibold text-red-600">{item.count}회</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {sectorType !== 'theme' && (
+                      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-red-600" />
+                            업종 상승 빈도 Top 10
+                            <span className="text-sm text-gray-500 font-normal">(최근 {dates.length}일)</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getTopFrequentSectors('up', 'industries').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/industry/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-red-600">{item.count}회</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingDown className="w-5 h-5 text-blue-600" />
+                            업종 하락 빈도 Top 10
+                            <span className="text-sm text-gray-500 font-normal">(최근 {dates.length}일)</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getTopFrequentSectors('down', 'industries').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/industry/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-blue-600">{item.count}회</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg p-6 shadow-sm border">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <TrendingDown className="w-5 h-5 text-blue-600" />
-                    테마 하락 빈도 Top 10
-                    <span className="text-sm text-gray-500 font-normal">
-                      (최근 {dates.length}일)
-                    </span>
-                  </h3>
-                  <div className="space-y-2">
-                    {getTopFrequentSectors('down', 'themes').map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <Link href={`/stocks/browse/theme/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
-                          {idx + 1}. {item.name}
-                        </Link>
-                        <span className="font-semibold text-blue-600">{item.count}회</span>
+                    )}
+                    {sectorType !== 'industry' && (
+                      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-red-600" />
+                            테마 상승 빈도 Top 10
+                            <span className="text-sm text-gray-500 font-normal">(최근 {dates.length}일)</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getTopFrequentSectors('up', 'themes').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/theme/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-red-600">{item.count}회</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg p-6 shadow-sm border">
+                          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <TrendingDown className="w-5 h-5 text-blue-600" />
+                            테마 하락 빈도 Top 10
+                            <span className="text-sm text-gray-500 font-normal">(최근 {dates.length}일)</span>
+                          </h3>
+                          <div className="space-y-2">
+                            {getTopFrequentSectors('down', 'themes').map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link href={`/stocks/browse/theme/${encodeURIComponent(item.name)}`} className="text-gray-700 hover:text-blue-600 hover:underline">
+                                  {idx + 1}. {item.name}
+                                </Link>
+                                <span className="font-semibold text-blue-600">{item.count}회</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+                    )}
+                  </>
+                )}
               </>
             )}
 

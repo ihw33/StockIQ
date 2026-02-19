@@ -68,8 +68,18 @@ async def _run_macro_collection(mode: str = "am"):
     except Exception as e:
         print(f"[Macro Scheduler] {mode.upper()} 수집 실패: {e}")
 
+async def _run_sector_collection():
+    """장 마감 후 섹터 데이터 크롤링"""
+    try:
+        print(f"[Sector Scheduler] 섹터 크롤링 시작: {dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%H:%M:%S')}")
+        await sectors.fetch_sector_data()
+        print(f"[Sector Scheduler] 섹터 크롤링 완료")
+    except Exception as e:
+        print(f"[Sector Scheduler] 섹터 크롤링 실패: {e}")
+
 SCHEDULE = [
     {"hour": 7, "minute": 0, "mode": "am"},
+    {"hour": 15, "minute": 30, "mode": "sector"},
     {"hour": 18, "minute": 0, "mode": "pm"},
 ]
 
@@ -131,7 +141,10 @@ async def _macro_scheduler():
 
             # 수집 실행
             print(f"[Macro Scheduler] === {dt_datetime.now(kst).strftime('%Y-%m-%d %H:%M')} {next_mode.upper()} 수집 시작 ===")
-            await _run_macro_collection(next_mode)
+            if next_mode == "sector":
+                await _run_sector_collection()
+            else:
+                await _run_macro_collection(next_mode)
             print(f"[Macro Scheduler] === {next_mode.upper()} 수집 완료 ===")
 
             # 수집 후 1분 대기 (중복 실행 방지)
