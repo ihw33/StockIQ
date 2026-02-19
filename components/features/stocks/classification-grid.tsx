@@ -29,7 +29,7 @@ export function ClassificationGrid({ type, onSectorClick }: ClassificationGridPr
         ? '/api/stocks/themes/list'
         : '/api/stocks/groups/list'
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
       console.log('Fetching from:', `${apiUrl}${endpoint}`)
 
       const res = await fetch(`${apiUrl}${endpoint}`)

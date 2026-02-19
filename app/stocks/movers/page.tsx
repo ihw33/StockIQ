@@ -50,7 +50,7 @@ export default function StockMoversPage() {
     try {
       const days = currentRange?.days || 30
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/stocks/movers/history?days=${days}`
+        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/stocks/movers/history?days=${days}`
       )
       const data = await res.json()
       setHistoryData(data.data || {})
@@ -64,7 +64,7 @@ export default function StockMoversPage() {
   const handleFetchStocks = async () => {
     setFetching(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/stocks/movers/fetch`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/stocks/movers/fetch`, {
         method: 'POST'
       })
 

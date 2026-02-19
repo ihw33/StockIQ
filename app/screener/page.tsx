@@ -10,7 +10,7 @@ import {
 import { useWatchlist } from '@/lib/hooks/use-watchlist'
 import { usePortfolioStore } from '@/lib/stores/portfolio-store'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
 interface DiscoverResult {
   symbol: string

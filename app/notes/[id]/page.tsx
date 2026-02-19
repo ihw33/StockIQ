@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Edit2, Trash2, Save, X, TrendingUp, TrendingDown, MessageSquarePlus, Send } from 'lucide-react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
 interface ExitPlanData {
   preset?: string

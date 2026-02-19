@@ -33,7 +33,7 @@ export default function StocksBrowsePage() {
   const [activeTab, setActiveTab] = useState<ClassificationType>('industry')
   const [fetching, setFetching] = useState(false)
   const [fetchResult, setFetchResult] = useState<any>(null)
-  const [selectedSector, setSelectedSector] = useState<{ name: string, type: 'industry' | 'theme' } | null>(null)
+  const [selectedSector, setSelectedSector] = useState<{ name: string, type: 'industry' | 'theme' | 'group' } | null>(null)
   const [sectorStocks, setSectorStocks] = useState<any[]>([])
   const [loadingStocks, setLoadingStocks] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -48,13 +48,13 @@ export default function StocksBrowsePage() {
   const [batchStatus, setBatchStatus] = useState<any>(null)
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
 
-  const handleSectorClick = async (sectorName: string, sectorType: 'industry' | 'theme') => {
+  const handleSectorClick = async (sectorName: string, sectorType: 'industry' | 'theme' | 'group') => {
     setSelectedSector({ name: sectorName, type: sectorType })
     setLoadingStocks(true)
 
     try {
       // screener 캐시에서 조회 (빠름)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/list`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/list`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -86,7 +86,7 @@ export default function StocksBrowsePage() {
 
     setUpdating(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/update`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -128,7 +128,7 @@ export default function StocksBrowsePage() {
     setBatchUpdating(true)
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/update-all-sectors`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/update-all-sectors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -150,7 +150,7 @@ export default function StocksBrowsePage() {
       // 진행 상황 폴링 시작
       const interval = setInterval(async () => {
         try {
-          const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/batch-status/${data.batch_id}`)
+          const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/batch-status/${data.batch_id}`)
           if (!statusRes.ok) {
             clearInterval(interval)
             return
@@ -192,7 +192,7 @@ export default function StocksBrowsePage() {
     if (!confirmed) return
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/batch-cancel/${batchId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/batch-cancel/${batchId}`, {
         method: 'POST'
       })
 
@@ -231,7 +231,7 @@ export default function StocksBrowsePage() {
 
       const batchResults = await Promise.all(
         batches.map(async (batch) => {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/realtime`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/realtime`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ symbols: batch })
@@ -334,7 +334,7 @@ export default function StocksBrowsePage() {
   const handleFetchSectors = async () => {
     setFetching(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/sectors/fetch`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/sectors/fetch`, {
         method: 'POST'
       })
 

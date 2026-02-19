@@ -39,7 +39,7 @@ export default function SectorTrendsPage() {
     setFetching(true)
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/sectors/fetch`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/sectors/fetch`,
         { method: 'POST' }
       )
       const data = await res.json()
@@ -77,7 +77,7 @@ export default function SectorTrendsPage() {
       if (timeRange === 'weekly') {
         const typeParam = sectorType === 'all' ? '' : `?sector_type=${sectorType}`
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/sectors/weekly-summary${typeParam}`
+          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/sectors/weekly-summary${typeParam}`
         )
         const data = await res.json()
         setWeeklyData(data.data || null)
@@ -87,7 +87,7 @@ export default function SectorTrendsPage() {
         // 월간 탭: 패턴 분석 API
         const typeParam = sectorType === 'all' ? '' : `?sector_type=${sectorType}`
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/sectors/monthly-analysis${typeParam}`
+          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/sectors/monthly-analysis${typeParam}`
         )
         const data = await res.json()
         setMonthlyData(data.data ? { ...data.data, _meta: { period: data.period } } : { _error: data.message, _trading_days: data.trading_days ?? 0 })
@@ -98,7 +98,7 @@ export default function SectorTrendsPage() {
         const days = currentRange?.days || 30
         const typeParam = sectorType === 'all' ? '' : `&sector_type=${sectorType}`
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/sectors/history?days=${days}${typeParam}`
+          `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/sectors/history?days=${days}${typeParam}`
         )
         const data = await res.json()
         setHistoryData(data.data || {})

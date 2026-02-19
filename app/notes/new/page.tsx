@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Search, X, Bell, Target, TrendingUp, Eye, CheckSquare, Zap } from 'lucide-react'
 import { usePortfolioStore } from '@/lib/stores/portfolio-store'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
 type Tab = 'basic' | 'reason' | 'plan' | 'market' | 'review'
 type TradeType = 'watch' | 'buy' | 'sell'
@@ -143,6 +143,14 @@ const EMPTY_WATCH_DATA: WatchData = {
 }
 
 export default function NewNotePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="text-slate-400">로딩 중...</div></div>}>
+      <NewNoteContent />
+    </Suspense>
+  )
+}
+
+function NewNoteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<Tab>('basic')

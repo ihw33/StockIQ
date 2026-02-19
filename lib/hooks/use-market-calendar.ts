@@ -11,7 +11,7 @@ export function useMarketCalendar(days = 60) {
   const [calendar, setCalendar] = useState<Record<string, CalendarEntry>>({})
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/market/calendar?days=${days}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/market/calendar?days=${days}`)
       .then(r => r.json())
       .then(data => {
         const map: Record<string, CalendarEntry> = {}

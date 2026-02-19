@@ -99,7 +99,7 @@ function SimpleChart({ symbol, name }: { symbol: string; name: string }) {
         Promise.all([
             fetch(`/api/stock/quote?symbol=${symbol}`).then(r => r.ok ? r.json() : null),
             fetch(`/api/stock/chart?symbol=${symbol}&interval=D`).then(r => r.ok ? r.json() : []),
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/notes?symbol=${symbol}&status=hold`).then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/notes?symbol=${symbol}&status=hold`).then(r => r.ok ? r.json() : []).catch(() => []),
         ]).then(([q, c, notes]) => {
             if (ignore) return;
             const chartArr = Array.isArray(c) ? c.slice(-120) : [];
@@ -721,7 +721,7 @@ export default function TerminalPage() {
 
     const fetchStockName = async (code: string) => {
         try {
-            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/stocks/${code}`);
+            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/stocks/${code}`);
             const d = await r.json(); if (d.name) setActiveName(d.name);
         } catch { }
     };

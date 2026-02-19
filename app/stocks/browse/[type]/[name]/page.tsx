@@ -49,7 +49,7 @@ export default function StockListPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'}/api/screener/v2/list`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'}/api/screener/v2/list`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

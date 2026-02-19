@@ -30,7 +30,7 @@ interface TradeNote {
   created_at: string
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
 const TYPE_LABELS: Record<string, string> = { buy: '매수', sell: '매도', watch: '관심' }
 
