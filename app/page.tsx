@@ -78,10 +78,12 @@ export default function HomePage() {
 
   const loadSectors = async () => {
     try {
-      const res = await fetch(`${API}/api/sectors/trends?time_range=daily&sector_type=all`)
+      const res = await fetch(`${API}/api/sectors/history?days=1`)
       const data = await res.json()
       // 업종 상위 3 / 하위 3
-      const industries = data?.data?.[0]?.industries || {}
+      const dates = Object.keys(data?.data || {})
+      const latest = dates.length > 0 ? data.data[dates[0]] : null
+      const industries = latest?.industries || {}
       const up = (industries.up || []).slice(0, 3)
       const down = (industries.down || []).slice(0, 3)
       setSectors({ up, down })

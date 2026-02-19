@@ -59,6 +59,7 @@ services:
       - stockiq-api
     environment:
       BACKEND_URL: http://stockiq-api:8001
+      AI_ENGINE_URL: http://stockiq-api:8001
       KIWOOM_APP_KEY: ${KIWOOM_APP_KEY}
       KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY}
       KIWOOM_BASE_URL: ${KIWOOM_BASE_URL:-https://openapi.koreainvestment.com:9443}

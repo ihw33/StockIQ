@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS macro_daily (
     news_context TEXT,
     economic_calendar JSONB,
     llm_analysis_pm TEXT,
-    collected_at_pm TIMESTAMP,
+    collected_at_pm TIMESTAMPTZ,
     us2y_value NUMERIC(6,3),
     us2y_change_bps NUMERIC(8,3),
     spread_2s10s NUMERIC(8,3),

@@ -21,6 +21,7 @@ from routers import strategy, reports, market, macro, screener, portfolio, alpha
 # Import for scheduler
 from models.requests import MacroCollectRequest
 from routers.macro import collect_macro_data
+from utils.telegram_bot import send_notification
 
 app = FastAPI(title="StockIQ AI Engine", description="Python-based AI Trading Backend")
 
@@ -65,8 +66,10 @@ async def _run_macro_collection(mode: str = "am"):
         print(f"[Macro Scheduler] {mode.upper()} 수집 시작: {dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%H:%M:%S')}")
         await collect_macro_data(MacroCollectRequest(mode=mode))
         print(f"[Macro Scheduler] {mode.upper()} 수집 완료")
+        await send_notification(f"[StockIQ] 매크로 {mode.upper()} 수집 완료 ✅\n{dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M')}")
     except Exception as e:
         print(f"[Macro Scheduler] {mode.upper()} 수집 실패: {e}")
+        await send_notification(f"[StockIQ] 매크로 {mode.upper()} 수집 실패 ❌\n{str(e)[:100]}")
 
 async def _run_sector_collection():
     """장 마감 후 섹터 데이터 크롤링"""
@@ -74,8 +77,10 @@ async def _run_sector_collection():
         print(f"[Sector Scheduler] 섹터 크롤링 시작: {dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%H:%M:%S')}")
         await sectors.fetch_sector_data()
         print(f"[Sector Scheduler] 섹터 크롤링 완료")
+        await send_notification(f"[StockIQ] 섹터 크롤링 완료 ✅\n{dt_datetime.now(pytz.timezone('Asia/Seoul')).strftime('%Y-%m-%d %H:%M')}")
     except Exception as e:
         print(f"[Sector Scheduler] 섹터 크롤링 실패: {e}")
+        await send_notification(f"[StockIQ] 섹터 크롤링 실패 ❌\n{str(e)[:100]}")
 
 SCHEDULE = [
     {"hour": 7, "minute": 0, "mode": "am"},
