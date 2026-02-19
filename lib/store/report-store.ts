@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export interface AnalysisReport {
     id: string;
+    dbId?: number; // Database ID from backend
     symbol: string;
     symbolName: string;
     mode: 'algo' | 'llm' | 'company';
@@ -18,7 +19,8 @@ export interface AnalysisReport {
 
 interface ReportStore {
     reports: AnalysisReport[];
-    addReport: (report: Omit<AnalysisReport, 'id' | 'timestamp'>) => string;
+    deletedDbIds: number[]; // Track deleted DB IDs to prevent re-adding
+    addReport: (report: Omit<AnalysisReport, 'id' | 'timestamp'> & { timestamp?: Date }) => string;
     getReportsBySymbol: (symbol: string) => AnalysisReport[];
     getReportsBySession: (sessionId: string) => AnalysisReport[];
     getRecentReports: (limit?: number) => AnalysisReport[];
@@ -31,25 +33,18 @@ export const useReportStore = create<ReportStore>()(
     persist(
         (set, get) => ({
             reports: [],
+            deletedDbIds: [],
 
             addReport: (report) => {
                 const newReport: AnalysisReport = {
                     ...report,
-                    id: `${report.symbol}_${Date.now()}`,
-                    timestamp: new Date(),
+                    id: `${report.symbol}_${report.mode}_${Date.now()}`,
+                    timestamp: report.timestamp || new Date(),
                 };
 
-                const today = new Date().toDateString();
-
                 set((state) => ({
-                    // Remove same symbol + same mode + same day before adding
-                    reports: [
-                        newReport,
-                        ...state.reports.filter((r) => {
-                            if (r.symbol !== report.symbol || r.mode !== report.mode) return true;
-                            return new Date(r.timestamp).toDateString() !== today;
-                        }),
-                    ].slice(0, 100),
+                    // Add new report without removing duplicates (keep all reports)
+                    reports: [newReport, ...state.reports].slice(0, 100),
                 }));
 
                 return newReport.id;
@@ -70,9 +65,14 @@ export const useReportStore = create<ReportStore>()(
             },
 
             deleteReport: (id) => {
-                set((state) => ({
-                    reports: state.reports.filter((r) => r.id !== id),
-                }));
+                set((state) => {
+                    const report = state.reports.find(r => r.id === id);
+                    const newDeletedIds = report?.dbId ? [...state.deletedDbIds, report.dbId] : state.deletedDbIds;
+                    return {
+                        reports: state.reports.filter((r) => r.id !== id),
+                        deletedDbIds: newDeletedIds,
+                    };
+                });
             },
 
             deleteSession: (sessionId) => {
@@ -94,6 +94,20 @@ export const useReportStore = create<ReportStore>()(
         }),
         {
             name: 'stockiq-reports',
+            onRehydrateStorage: () => (state) => {
+                // Clean up duplicate IDs after loading from storage
+                if (state) {
+                    const seen = new Set<string>();
+                    const cleaned = state.reports.filter(r => {
+                        if (seen.has(r.id)) return false;
+                        seen.add(r.id);
+                        return true;
+                    });
+                    if (cleaned.length !== state.reports.length) {
+                        state.reports = cleaned;
+                    }
+                }
+            },
         }
     )
 );

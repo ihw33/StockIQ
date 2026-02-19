@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env*.local
+.env
+*.log
+__pycache__
+*.pyc
+services/ai-engine/venv
+services/ai-engine/*.log
+services/ai-engine/__pycache__
+.DS_Store
+.vscode
+.idea

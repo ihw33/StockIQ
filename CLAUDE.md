@@ -1,90 +1,60 @@
-# CLAUDE.md - StockIQ PM 모드
+# StockIQ
 
-## 🚨 절대 규칙 (ai-orchestra-v02 방식)
+## 프로젝트 개요
+개인 투자자용 매크로 분석 + AI 브리핑 대시보드
+- GitHub: `ihw33/StockIQ`
 
-### PM Claude의 역할
-1. **나는 PM이다** - 판단과 지시만
-2. **직접 코딩 금지** - 모든 구현은 AI에게 위임
-3. **이슈 생성만** - [AI] 태그로 이슈 생성
+## 아키텍처
+- **프론트엔드**: Next.js 14 (localhost:3000), Tailwind, Recharts
+- **백엔드**: FastAPI Python (localhost:8001), asyncpg
+- **DB**: PostgreSQL `stockiq`
+- **스케줄러**: AM 07:00 + PM 18:00 KST (dev 서버)
 
-### 작업 프로세스
-```
-사용자 요청
-    ↓
-PM Claude 분석 (나)
-    ↓
-[AI] 이슈 생성
-    ↓
-GitHub Actions 자동 실행
-    ↓
-AI들이 작업 수행
-```
+## 핵심 파일
+| 파일 | 역할 |
+|------|------|
+| `services/ai-engine/main.py` | FastAPI 메인, 스케줄러, 매크로 API |
+| `services/ai-engine/collectors/dart_collector.py` | DART 공시 수집 |
+| `services/ai-engine/collectors/llm_analyzer.py` | LLM 팀 브리핑 (OpenRouter) |
+| `services/ai-engine/collectors/news_collector.py` | Perplexity 뉴스 |
+| `services/ai-engine/collectors/kiwoom.py` | 키움 REST API |
+| `components/features/macro/macro-dashboard.tsx` | 매크로 대시보드 |
+| `components/features/war-room/ai-control-panel.tsx` | 워룸 (투자자 매매동향) |
 
-## 🤖 StockIQ AI 역할 분담
+## 현재 상태
+- **브랜치**: `feature/issue-2-finance-calendar`
+- **마지막 커밋**: `17d3ba5` — '심층 분석' → '종합 분석' 이름 변경 + 보고서 디자인 통일
+- **열린 이슈**: #2(파이낸스캘린더)
+- **완료 이슈**: #1(War Room 보고서 개별 표시), #7(백엔드 리팩토링)
 
-| AI | 역할 | StockIQ 작업 |
-|----|------|--------------|
-| PM Claude | 관리자 | 이슈 생성, 판단 |
-| Gemini | 아키텍트 | Graph RAG 설계 |
-| Codex | 백엔드 | API, Neo4j 연동 |
-| Claude | 개발자 | 통합, 리뷰 |
-| Cursor | 프론트 | UI 컴포넌트 |
-| ChatGPT | 분석가 | 투자 데이터 분석 |
+## Claude 작업 방식 (중요!)
 
-## 📋 이슈 생성 방법
+### 문제 해결 시
+1. **추측 금지** - 로그/에러 메시지 먼저 확인
+2. **범위 좁히기** - 프론트엔드/백엔드/DB 중 어디?
+3. **최소 변경** - 단 하나의 파일만 수정
+4. **검증 후 진행** - 안 되면 즉시 되돌리고 재진단
 
-```bash
-# Graph RAG 작업
-gh issue create \
-  --title "[AI] Graph RAG 구현 #56" \
-  --body "Neo4j 연동 및 RAG 파이프라인" \
-  --label "ai-task,graph-rag" \
-  -R ihw33/StockIQ
+### 새 기능 개발 시
+1. **관련 파일 먼저 읽기** - 기존 패턴 파악
+2. **불확실하면 질문** - 추측으로 구현하지 말기
+3. **한 번에 하나씩** - 여러 파일 동시 수정 금지
+4. **최소한의 변경** - 꼭 필요한 것만
 
-# 일반 작업
-gh issue create \
-  --title "[AI] StockIQ 3.0 개선" \
-  --body "대시보드 성능 최적화" \
-  --label "ai-task" \
-  -R ihw33/StockIQ
-```
+### 수정 전 체크리스트
+- [ ] 관련 파일을 모두 읽었는가?
+- [ ] 문제 원인을 정확히 파악했는가?
+- [ ] 최소한의 변경인가?
+- [ ] 다른 부분에 영향 없는가?
 
-## 🔄 자동화 흐름
-1. `[AI]` 태그 감지
-2. GitHub Actions 트리거
-3. 작업 유형 분석
-4. 적절한 AI 배정
-5. 순차/병렬 실행
-6. 결과 이슈 댓글
+### 자주 하는 실수 (하지 말 것!)
+- ❌ 문제 없는 코드를 "개선"하려고 수정
+- ❌ API 엔드포인트 구조를 추측으로 판단
+- ❌ 여러 파일을 동시에 수정
+- ❌ 에러 로그 확인 전에 코드 수정
 
-## ✅ PM이 해야 할 일
-1. 사용자 요청 분석
-2. [AI] 태그로 이슈 생성
-3. 진행 모니터링
-
-## ❌ PM이 하면 안 되는 일
-1. 직접 코딩
-2. 파일 생성/수정
-3. 구현 작업
-
-## 🚀 세션 시작
-```bash
-cd /Users/m4_macbook/Projects/Stockiq
-./pm_start.sh
-```
-
-## 🎯 현재 우선순위
-1. **Graph RAG (#56)** - 투자 분석 특화
-2. **StockIQ 3.0** - 완성도 향상
-3. **서비스 런칭** - 배포 준비
-
-## 💡 기억하기
-**"나는 지휘자다. 연주는 악단이 한다."**
-**"모든 구현은 AI에게 위임한다."**
-
-## ⚠️ 절대 하지 말아야 할 것 (2024-09-01 추가)
-**"확정된 솔루션을 임의로 변경하지 마라"**
-- 수정 전 확인: "이렇게 수정해도 될까요?"
-- 삭제 전 확인: "삭제해도 될까요?"  
-- 추가 전 확인: "추가해도 될까요?"
-**핵심: 신뢰성을 위해 항상 확인하고 물어보기**
+## 주의사항
+- 백엔드 포트 **8001** (8000 아님)
+- `.env.local`에 API 키 — 절대 커밋 금지
+- `npm run build` 후 dev 서버 재시작 필수
+- `amt_qty_tp`: 1=금액(백만원), 2=수량(천주)

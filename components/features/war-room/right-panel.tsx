@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { AIControlPanel } from './ai-control-panel';
 import { BarChart3, FileText } from 'lucide-react';
@@ -36,8 +36,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
     const [activeTab, setActiveTab] = useState<Tab>('analysis');
     const [newReportCount, setNewReportCount] = useState(0);
     const [recentAlerts, setRecentAlerts] = useState<RecentAlert[]>([]);
-    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const [selectedFilter, setSelectedFilter] = useState<'all' | 'algo' | 'llm' | 'company'>('all');
+    const processedDbIdsRef = useRef<Set<number>>(new Set());
     const addReport = useReportStore((s) => s.addReport);
     const reports = useReportStore((s) => s.reports);
 
@@ -46,10 +46,18 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
         switchToReports: () => setActiveTab('reports'),
     }));
 
-    const goToReports = useCallback((sessionId?: string, mode?: 'algo' | 'llm' | 'company') => {
-        if (sessionId) setSelectedSessionId(sessionId);
+    const goToReports = useCallback((mode?: 'algo' | 'llm' | 'company') => {
         if (mode) setSelectedFilter(mode);
         setActiveTab('reports');
+    }, []);
+
+    // Debug: Track component lifecycle
+    useEffect(() => {
+        console.log('[RightPanel] Component mounted, processedDbIds count:', processedDbIdsRef.current.size);
+        console.log('[RightPanel] processedDbIds:', Array.from(processedDbIdsRef.current));
+        return () => {
+            console.log('[RightPanel] Component unmounting, processedDbIds count:', processedDbIdsRef.current.size);
+        };
     }, []);
 
     // Poll for backend-saved analysis reports
@@ -61,25 +69,53 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
                 const data = await res.json();
                 if (!data.reports?.length) return;
 
+                console.log(`[RightPanel] Poll found ${data.reports.length} reports from backend`);
+
+                // Get fresh deletedDbIds from store
+                const currentDeletedIds = useReportStore.getState().deletedDbIds;
+                const currentReports = useReportStore.getState().reports;
+                console.log(`[RightPanel] Current store has ${currentReports.length} reports`);
+                console.log(`[RightPanel] deletedDbIds:`, currentDeletedIds);
+
                 let newCount = 0;
                 const newAlerts: RecentAlert[] = [];
 
                 for (const r of data.reports) {
-                    const sessionId = `db_${r.id}`;
+                    // Skip if user deleted this report
+                    if (currentDeletedIds.includes(r.id)) {
+                        console.log(`[RightPanel] Skipping deleted report ID: ${r.id}`);
+                        continue;
+                    }
 
-                    // Skip if already in report store
-                    if (reports.some(rpt => rpt.sessionId === sessionId)) continue;
+                    // Skip if already processed
+                    if (processedDbIdsRef.current.has(r.id)) {
+                        console.log(`[RightPanel] Skipping already processed report ID: ${r.id}`);
+                        continue;
+                    }
+
+                    // Check if this dbId already exists in store
+                    const existsInStore = currentReports.some(existing => existing.dbId === r.id);
+                    if (existsInStore) {
+                        console.log(`[RightPanel] Report ID ${r.id} already exists in store - marking as processed without adding`);
+                        processedDbIdsRef.current.add(r.id);
+                        continue;
+                    }
 
                     const mode = r.analysis_type === 'algo' ? 'algo' as const
                         : r.analysis_type === 'company_fundamental' ? 'company' as const
                         : 'llm' as const;
 
+                    // Mark as processed before adding
+                    processedDbIdsRef.current.add(r.id);
+                    console.log(`[RightPanel] Adding report ID: ${r.id}, mode: ${mode}, processed count: ${processedDbIdsRef.current.size}`);
+
                     addReport({
+                        dbId: r.id,
                         symbol: r.symbol,
                         symbolName: r.stock_name || r.symbol,
                         mode,
                         analysis: r.analysis,
-                        sessionId,
+                        timestamp: new Date(r.analyzed_at),
                     });
 
                     newAlerts.push({
@@ -105,17 +141,21 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
         // Build initial alerts from recent reports already in store (last 10 min)
         const tenMinAgo = Date.now() - 10 * 60 * 1000;
         const existingRecent = reports
-            .filter(r => r.sessionId?.startsWith('db_') && new Date(r.timestamp).getTime() > tenMinAgo)
+            .filter(r => new Date(r.timestamp).getTime() > tenMinAgo)
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 10)
-            .map(r => ({
-                id: parseInt(r.sessionId!.replace('db_', '')),
-                symbol: r.symbol,
-                stockName: r.symbolName,
-                analysisType: r.mode === 'algo' ? 'algo' : r.mode === 'company' ? 'company_fundamental' : 'deep_llm',
-                mode: r.mode,
-                analyzedAt: new Date(r.timestamp).toISOString(),
-            }));
+            .map(r => {
+                // Mark existing reports as processed
+                if (r.dbId) processedDbIdsRef.current.add(r.dbId);
+                return {
+                    id: r.dbId || parseInt(r.id.split('_')[1] || '0'),
+                    symbol: r.symbol,
+                    stockName: r.symbolName,
+                    analysisType: r.mode === 'algo' ? 'algo' : r.mode === 'company' ? 'company_fundamental' : 'deep_llm',
+                    mode: r.mode,
+                    analyzedAt: new Date(r.timestamp).toISOString(),
+                };
+            });
         if (existingRecent.length > 0) {
             setRecentAlerts(existingRecent);
         }
@@ -123,7 +163,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
         checkPending();
         const interval = setInterval(checkPending, 15000);
         return () => clearInterval(interval);
-    }, [addReport, reports]);
+    }, [addReport]);
 
     // Clear badge when switching to reports tab
     useEffect(() => {
@@ -177,7 +217,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
                         onGoToReports={goToReports}
                     />
                 ) : (
-                    <ReportsTab initialSessionId={selectedSessionId} initialFilter={selectedFilter} />
+                    <ReportsTab initialFilter={selectedFilter} />
                 )}
             </div>
         </div>

@@ -14,6 +14,20 @@ def build_enhanced_system_prompt() -> str:
 
 ---
 
+## 🧠 심층분석 방법론
+
+**단계별로 깊이 생각하며 분석하세요:**
+
+1. **먼저** 매크로 환경 → 시장 수급 → 알고리즘 분석 순으로 큰 그림 파악
+2. **그 다음** 종목의 기술적 상태를 멀티 타임프레임으로 종합
+3. **이후** 포지션 정보(있다면)를 고려하여 리스크/보상 비율 계산
+4. **마지막으로** 구체적 가격대와 시나리오를 도출
+
+**각 판단의 근거를 명확히 제시하고, 불확실한 부분은 솔직히 인정하세요.**
+"~일 가능성이 있습니다", "~를 확인 후 판단하세요" 같은 표현을 적극 사용하세요.
+
+---
+
 ## 📋 분석 원칙
 
 ### 1️⃣ 보유자 (Position Holder) 전략
@@ -245,6 +259,24 @@ DXY({macro['scores']['dxy']:+d}) | US10Y({macro['scores']['us10y']:+d}) | VIX({m
         import traceback
         traceback.print_exc()
 
+    # DART 기업개황 + 최근 공시
+    dart_context = ""
+    try:
+        from collectors.dart_collector import get_company_overview, collect_dart_filings
+        overview = get_company_overview(symbol)
+        if overview:
+            est = overview['est_dt']
+            est_fmt = f"{est[:4]}.{est[4:6]}.{est[6:8]}" if len(est) == 8 else est
+            dart_context += f"**DART 기업개황:** 업종: {overview['induty_name']} | 대표자: {overview['ceo_nm']} | 설립: {est_fmt}\n"
+
+        filings = collect_dart_filings([{"symbol": symbol, "name": stock_name}], days=3)
+        if filings.get("filings_text"):
+            dart_context += f"**최근 공시 (3일):**\n{filings['filings_text']}\n"
+        if dart_context:
+            print(f"[Prompts] DART context added")
+    except Exception as e:
+        print(f"[Prompts] DART context unavailable (non-fatal): {e}")
+
     # Position info (if available)
     position_context = ""
     if position_info:
@@ -301,7 +333,7 @@ DXY({macro['scores']['dxy']:+d}) | US10Y({macro['scores']['us10y']:+d}) | VIX({m
 {position_context}
 
 ## 📊 시장 상황 요약
-{intraday_info}{us_context}{macro_context}{investor_context}{stress_summary}
+{intraday_info}{us_context}{macro_context}{investor_context}{dart_context}{stress_summary}
 {vol_summary}
 
 ---
@@ -339,7 +371,7 @@ DXY({macro['scores']['dxy']:+d}) | US10Y({macro['scores']['us10y']:+d}) | VIX({m
         context = f"""
 # {symbol} 기술적 분석 결과
 
-{intraday_info}{us_context}{macro_context}{investor_context}{stress_summary}
+{intraday_info}{us_context}{macro_context}{investor_context}{dart_context}{stress_summary}
 {vol_summary}{strategy_warning}
 
 ---

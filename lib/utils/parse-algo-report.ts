@@ -18,6 +18,9 @@ export interface ParsedTimeframe {
     stopLoss?: string;
     target?: string;
     extra?: string;
+    supports?: string;  // 지지선
+    resistances?: string;  // 저항선
+    targets?: string[];  // 목표가 (여러 개)
     rawMarkdown: string;
 }
 
@@ -54,6 +57,13 @@ export interface ParsedAlgoReport {
         avgDaily: string;
         level: string;
         warning?: string;
+        rawMarkdown?: string;  // Full markdown section for detailed rendering
+        volumeLevel?: string;
+        volumeTrend?: string;
+        avgTradeAmount?: string;
+        tradeAmountTrend?: string;
+        buyingPressure?: string;
+        buyingPressureStatus?: string;
     };
     smartSummary: ParsedSmartSummary;
     timeframes: ParsedTimeframe[];
@@ -74,24 +84,28 @@ function extractPrice(text: string): string | undefined {
 
 function parseVolatilitySection(section: string): ParsedAlgoReport['volatility'] {
     const days: ParsedVolatilityDay[] = [];
-    const tableRows = section.match(/\|[^|]+\|[^|]+\|[^|]+\|[^|]+\|[^|]+\|/g) || [];
+    const tableRows = section.match(/\|[^|\n]+\|[^|\n]+\|[^|\n]+\|[^|\n]+\|[^|\n]+\|[^|\n]+\|/g) || [];
 
     for (const row of tableRows) {
         if (row.includes('날짜') || row.includes('---')) continue;
         const cells = row.split('|').map(c => c.trim()).filter(Boolean);
-        if (cells.length >= 4) {
-            const changePct = parseFloat(cells[2]) || 0;
+        if (cells.length >= 5) {
+            const changePct = parseFloat(cells[2].replace('%', '')) || 0;
             let status: ParsedVolatilityDay['status'] = 'flat';
             if (changePct > 3) status = 'surge';
             else if (changePct > 0) status = 'up';
             else if (changePct < -3) status = 'crash';
             else if (changePct < 0) status = 'down';
 
+            // Extract volume ratio from cells[3] (e.g., "📈 5.2억주 (1.8배)")
+            const volMatch = cells[3].match(/([0-9.]+)배/);
+            const volumeRatio = volMatch ? volMatch[1] + 'x' : cells[3].replace(/[📈📊📉]/g, '').trim();
+
             days.push({
                 date: cells[0],
                 close: cells[1],
                 changePct,
-                volumeRatio: cells[3].replace(/[📈📊📉]/g, '').trim(),
+                volumeRatio,
                 status,
             });
         }
@@ -99,8 +113,16 @@ function parseVolatilitySection(section: string): ParsedAlgoReport['volatility']
 
     const cumMatch = section.match(/5일 누적 변동:\s*([^\|*]+)/);
     const avgMatch = section.match(/평균 일간 변동:\s*([^\|*]+)/);
-    const levelMatch = section.match(/변동성 수준:\s*(\w+)/);
+    const levelMatch = section.match(/변동성[:\s]*(\w+)/);
     const warningMatch = section.match(/⚠️\s*\*\*([^*]+)\*\*/);
+
+    // Parse volume and trade amount summary
+    const volumeLevelMatch = section.match(/거래량 수준:\s*([^\s(]+)/);
+    const volumeTrendMatch = section.match(/거래량[^|]*\|\s*[^:]*추이:\s*([^\n*]+)/);
+    const avgTradeAmountMatch = section.match(/평균 거래대금:\s*([^\s|]+)/);
+    const tradeAmountTrendMatch = section.match(/거래대금[^|]*\|\s*[^:]*추이:\s*([^\n*]+)/);
+    const buyingPressureMatch = section.match(/체결강도 추정:\s*(\d+)점/);
+    const buyingPressureStatusMatch = section.match(/체결강도 추정:[^(]+\(([^)]+)\)/);
 
     return {
         days,
@@ -108,6 +130,13 @@ function parseVolatilitySection(section: string): ParsedAlgoReport['volatility']
         avgDaily: avgMatch ? avgMatch[1].trim() : '',
         level: levelMatch ? levelMatch[1].trim() : 'NORMAL',
         warning: warningMatch ? warningMatch[1].trim() : undefined,
+        rawMarkdown: section,  // Full markdown section for detailed rendering
+        volumeLevel: volumeLevelMatch ? volumeLevelMatch[1].trim() : undefined,
+        volumeTrend: volumeTrendMatch ? volumeTrendMatch[1].trim() : undefined,
+        avgTradeAmount: avgTradeAmountMatch ? avgTradeAmountMatch[1].trim() : undefined,
+        tradeAmountTrend: tradeAmountTrendMatch ? tradeAmountTrendMatch[1].trim() : undefined,
+        buyingPressure: buyingPressureMatch ? buyingPressureMatch[1].trim() + '점' : undefined,
+        buyingPressureStatus: buyingPressureStatusMatch ? buyingPressureStatusMatch[1].trim() : undefined,
     };
 }
 
@@ -183,8 +212,8 @@ function parseTimeframeSection(section: string, rawMarkdown: string): ParsedTime
         // Extract opinion line (weekly)
         const opinionMatch = section.match(/\*\*투자 의견:\*\*\s*([🟢🟡🔴]+)\s*\*\*([^*]+)\*\*/);
 
-        // Extract prices
-        const entryMatch = section.match(/진입\s*([\d,~]+원[^\|]*)/);
+        // Extract prices (more precise patterns)
+        const entryMatch = section.match(/진입\s*([\d,~]+원)(?:\s|$|-)/);
         const slMatch = section.match(/손절\s*([\d,]+원)/);
         const targetMatch = section.match(/목표\s*([\d,]+원)/);
 
@@ -192,6 +221,20 @@ function parseTimeframeSection(section: string, rawMarkdown: string): ParsedTime
         let extra: string | undefined;
         const bonusMatch = section.match(/###\s*💡[^\n]*\n([\s\S]*?)(?=\n---|\n##|$)/);
         if (bonusMatch) extra = bonusMatch[1].trim();
+
+        // Extract support/resistance levels
+        const supportsMatch = section.match(/\*\*지지선:\*\*\s*([^\n]+)/);
+        const resistancesMatch = section.match(/\*\*저항선:\*\*\s*([^\n]+)/);
+
+        // Extract multiple targets
+        const targetsMatch = section.match(/🎯\s*목표\s*([^\n]+)/);
+        const targets: string[] = [];
+        if (targetsMatch) {
+            // Parse targets like "155,000원 → 160,000원 → 165,000원"
+            const targetStr = targetsMatch[1];
+            const targetPrices = targetStr.split('→').map(t => t.trim());
+            targets.push(...targetPrices);
+        }
 
         return {
             name,
@@ -206,6 +249,9 @@ function parseTimeframeSection(section: string, rawMarkdown: string): ParsedTime
             stopLoss: slMatch ? slMatch[1].trim() : undefined,
             target: targetMatch ? targetMatch[1].trim() : undefined,
             extra,
+            supports: supportsMatch ? supportsMatch[1].trim() : undefined,
+            resistances: resistancesMatch ? resistancesMatch[1].trim() : undefined,
+            targets: targets.length > 0 ? targets : undefined,
             rawMarkdown: rawMarkdown,
         };
     } catch {
@@ -245,7 +291,7 @@ function parseSmartSummary(section: string): ParsedSmartSummary {
 export function parseAlgoReport(markdown: string): ParsedAlgoReport {
     // Extract symbol and current price from header
     const symbolMatch = markdown.match(/# 🧠\s*(\S+)\s*멀티/);
-    const priceMatch = markdown.match(/\*\*현재가\*\*:\s*([\d,]+원)/);
+    const priceMatch = markdown.match(/>\s*\*\*현재가\*\*:\s*([\d,]+원)/);
 
     // Split into sections by ## headers
     const sections = markdown.split(/(?=## )/);
@@ -267,10 +313,10 @@ export function parseAlgoReport(markdown: string): ParsedAlgoReport {
     }
 
     // Parse volatility section
-    const volSection = sections.find(s => s.includes('최근 5일 변동'));
+    const volSection = sections.find(s => s.includes('최근 5일 거래') || s.includes('최근 5일 변동'));
     const volatility = volSection
         ? parseVolatilitySection(volSection)
-        : { days: [], cumulativeChange: '', avgDaily: '', level: 'NORMAL' };
+        : { days: [], cumulativeChange: '', avgDaily: '', level: 'NORMAL', rawMarkdown: undefined };
 
     // Parse smart summary
     const summarySection = sections.find(s => s.includes('현재 시장 상황'));

@@ -1,0 +1,555 @@
+[
+  {
+    "rank": 4,
+    "name": "증권",
+    "change_pct": 38.0,
+    "stocks_count": "+7.88%",
+    "crawled_at": "2026-02-13T16:22:14.548968"
+  },
+  {
+    "rank": 5,
+    "name": "무선통신서비스",
+    "change_pct": 4.0,
+    "stocks_count": "+7.73%",
+    "crawled_at": "2026-02-13T16:22:14.548998"
+  },
+  {
+    "rank": 6,
+    "name": "항공사",
+    "change_pct": 9.0,
+    "stocks_count": "+2.42%",
+    "crawled_at": "2026-02-13T16:22:14.549014"
+  },
+  {
+    "rank": 7,
+    "name": "기타금융",
+    "change_pct": 6.0,
+    "stocks_count": "+2.39%",
+    "crawled_at": "2026-02-13T16:22:14.549030"
+  },
+  {
+    "rank": 8,
+    "name": "다각화된소비자서비스",
+    "change_pct": 1.0,
+    "stocks_count": "+2.16%",
+    "crawled_at": "2026-02-13T16:22:14.549047"
+  },
+  {
+    "rank": 12,
+    "name": "건강관리업체및서비스",
+    "change_pct": 29.0,
+    "stocks_count": "+2.02%",
+    "crawled_at": "2026-02-13T16:22:14.549071"
+  },
+  {
+    "rank": 13,
+    "name": "창업투자",
+    "change_pct": 99.0,
+    "stocks_count": "+1.94%",
+    "crawled_at": "2026-02-13T16:22:14.549087"
+  },
+  {
+    "rank": 14,
+    "name": "가구",
+    "change_pct": 11.0,
+    "stocks_count": "+1.53%",
+    "crawled_at": "2026-02-13T16:22:14.549101"
+  },
+  {
+    "rank": 15,
+    "name": "카드",
+    "change_pct": 1.0,
+    "stocks_count": "+1.30%",
+    "crawled_at": "2026-02-13T16:22:14.549116"
+  },
+  {
+    "rank": 16,
+    "name": "생명보험",
+    "change_pct": 5.0,
+    "stocks_count": "+1.00%",
+    "crawled_at": "2026-02-13T16:22:14.549129"
+  },
+  {
+    "rank": 20,
+    "name": "담배",
+    "change_pct": 1.0,
+    "stocks_count": "+0.93%",
+    "crawled_at": "2026-02-13T16:22:14.549149"
+  },
+  {
+    "rank": 21,
+    "name": "건축자재",
+    "change_pct": 52.0,
+    "stocks_count": "+0.86%",
+    "crawled_at": "2026-02-13T16:22:14.549163"
+  },
+  {
+    "rank": 22,
+    "name": "반도체와반도체장비",
+    "change_pct": 167.0,
+    "stocks_count": "+0.61%",
+    "crawled_at": "2026-02-13T16:22:14.549176"
+  },
+  {
+    "rank": 23,
+    "name": "전문소매",
+    "change_pct": 6.0,
+    "stocks_count": "+0.55%",
+    "crawled_at": "2026-02-13T16:22:14.549190"
+  },
+  {
+    "rank": 24,
+    "name": "부동산",
+    "change_pct": 34.0,
+    "stocks_count": "+0.39%",
+    "crawled_at": "2026-02-13T16:22:14.549203"
+  },
+  {
+    "rank": 28,
+    "name": "다각화된통신서비스",
+    "change_pct": 3.0,
+    "stocks_count": "+0.29%",
+    "crawled_at": "2026-02-13T16:22:14.549223"
+  },
+  {
+    "rank": 29,
+    "name": "에너지장비및서비스",
+    "change_pct": 30.0,
+    "stocks_count": "+0.28%",
+    "crawled_at": "2026-02-13T16:22:14.549236"
+  },
+  {
+    "rank": 30,
+    "name": "인터넷과카탈로그소매",
+    "change_pct": 8.0,
+    "stocks_count": "+0.28%",
+    "crawled_at": "2026-02-13T16:22:14.549249"
+  },
+  {
+    "rank": 31,
+    "name": "운송인프라",
+    "change_pct": 8.0,
+    "stocks_count": "+0.26%",
+    "crawled_at": "2026-02-13T16:22:14.549263"
+  },
+  {
+    "rank": 32,
+    "name": "가스유틸리티",
+    "change_pct": 12.0,
+    "stocks_count": "+0.26%",
+    "crawled_at": "2026-02-13T16:22:14.549278"
+  },
+  {
+    "rank": 36,
+    "name": "컴퓨터와주변기기",
+    "change_pct": 22.0,
+    "stocks_count": "+0.25%",
+    "crawled_at": "2026-02-13T16:22:14.549298"
+  },
+  {
+    "rank": 37,
+    "name": "광고",
+    "change_pct": 17.0,
+    "stocks_count": "+0.22%",
+    "crawled_at": "2026-02-13T16:22:14.549312"
+  },
+  {
+    "rank": 38,
+    "name": "해운사",
+    "change_pct": 11.0,
+    "stocks_count": "+0.20%",
+    "crawled_at": "2026-02-13T16:22:14.549325"
+  },
+  {
+    "rank": 39,
+    "name": "음료",
+    "change_pct": 16.0,
+    "stocks_count": "+0.12%",
+    "crawled_at": "2026-02-13T16:22:14.549338"
+  },
+  {
+    "rank": 40,
+    "name": "가정용기기와용품",
+    "change_pct": 20.0,
+    "stocks_count": "+0.07%",
+    "crawled_at": "2026-02-13T16:22:14.549351"
+  },
+  {
+    "rank": 44,
+    "name": "식품과기본식료품소매",
+    "change_pct": 8.0,
+    "stocks_count": "-0.02%",
+    "crawled_at": "2026-02-13T16:22:14.549371"
+  },
+  {
+    "rank": 45,
+    "name": "판매업체",
+    "change_pct": 13.0,
+    "stocks_count": "-0.02%",
+    "crawled_at": "2026-02-13T16:22:14.549384"
+  },
+  {
+    "rank": 46,
+    "name": "방송과엔터테인먼트",
+    "change_pct": 58.0,
+    "stocks_count": "-0.06%",
+    "crawled_at": "2026-02-13T16:22:14.549397"
+  },
+  {
+    "rank": 47,
+    "name": "석유와가스",
+    "change_pct": 19.0,
+    "stocks_count": "-0.11%",
+    "crawled_at": "2026-02-13T16:22:14.549412"
+  },
+  {
+    "rank": 48,
+    "name": "호텔,레스토랑,레저",
+    "change_pct": 21.0,
+    "stocks_count": "-0.14%",
+    "crawled_at": "2026-02-13T16:22:14.549428"
+  },
+  {
+    "rank": 52,
+    "name": "전기유틸리티",
+    "change_pct": 5.0,
+    "stocks_count": "-0.24%",
+    "crawled_at": "2026-02-13T16:22:14.549448"
+  },
+  {
+    "rank": 53,
+    "name": "소프트웨어",
+    "change_pct": 73.0,
+    "stocks_count": "-0.26%",
+    "crawled_at": "2026-02-13T16:22:14.549461"
+  },
+  {
+    "rank": 54,
+    "name": "기계",
+    "change_pct": 99.0,
+    "stocks_count": "-0.29%",
+    "crawled_at": "2026-02-13T16:22:14.549475"
+  },
+  {
+    "rank": 55,
+    "name": "건설",
+    "change_pct": 78.0,
+    "stocks_count": "-0.39%",
+    "crawled_at": "2026-02-13T16:22:14.549488"
+  },
+  {
+    "rank": 56,
+    "name": "도로와철도운송",
+    "change_pct": 7.0,
+    "stocks_count": "-0.43%",
+    "crawled_at": "2026-02-13T16:22:14.549502"
+  },
+  {
+    "rank": 60,
+    "name": "조선",
+    "change_pct": 31.0,
+    "stocks_count": "-0.43%",
+    "crawled_at": "2026-02-13T16:22:14.549522"
+  },
+  {
+    "rank": 61,
+    "name": "우주항공과국방",
+    "change_pct": 34.0,
+    "stocks_count": "-0.53%",
+    "crawled_at": "2026-02-13T16:22:14.549535"
+  },
+  {
+    "rank": 62,
+    "name": "종이와목재",
+    "change_pct": 15.0,
+    "stocks_count": "-0.54%",
+    "crawled_at": "2026-02-13T16:22:14.549548"
+  },
+  {
+    "rank": 63,
+    "name": "레저용장비와제품",
+    "change_pct": 13.0,
+    "stocks_count": "-0.61%",
+    "crawled_at": "2026-02-13T16:22:14.549562"
+  },
+  {
+    "rank": 64,
+    "name": "제약",
+    "change_pct": 172.0,
+    "stocks_count": "-0.62%",
+    "crawled_at": "2026-02-13T16:22:14.549575"
+  },
+  {
+    "rank": 68,
+    "name": "가정용품",
+    "change_pct": 11.0,
+    "stocks_count": "-0.65%",
+    "crawled_at": "2026-02-13T16:22:14.549595"
+  },
+  {
+    "rank": 69,
+    "name": "식품",
+    "change_pct": 91.0,
+    "stocks_count": "-0.73%",
+    "crawled_at": "2026-02-13T16:22:14.549608"
+  },
+  {
+    "rank": 70,
+    "name": "상업서비스와공급품",
+    "change_pct": 31.0,
+    "stocks_count": "-0.82%",
+    "crawled_at": "2026-02-13T16:22:14.549621"
+  },
+  {
+    "rank": 71,
+    "name": "백화점과일반상점",
+    "change_pct": 14.0,
+    "stocks_count": "-0.85%",
+    "crawled_at": "2026-02-13T16:22:14.549637"
+  },
+  {
+    "rank": 72,
+    "name": "화장품",
+    "change_pct": 66.0,
+    "stocks_count": "-0.85%",
+    "crawled_at": "2026-02-13T16:22:14.549653"
+  },
+  {
+    "rank": 76,
+    "name": "기타",
+    "change_pct": 1453.0,
+    "stocks_count": "-0.86%",
+    "crawled_at": "2026-02-13T16:22:14.549673"
+  },
+  {
+    "rank": 77,
+    "name": "섬유,의류,신발,호화품",
+    "change_pct": 84.0,
+    "stocks_count": "-0.91%",
+    "crawled_at": "2026-02-13T16:22:14.549687"
+  },
+  {
+    "rank": 78,
+    "name": "포장재",
+    "change_pct": 28.0,
+    "stocks_count": "-0.91%",
+    "crawled_at": "2026-02-13T16:22:14.549701"
+  },
+  {
+    "rank": 79,
+    "name": "생명과학도구및서비스",
+    "change_pct": 41.0,
+    "stocks_count": "-1.00%",
+    "crawled_at": "2026-02-13T16:22:14.549715"
+  },
+  {
+    "rank": 80,
+    "name": "은행",
+    "change_pct": 10.0,
+    "stocks_count": "-1.23%",
+    "crawled_at": "2026-02-13T16:22:14.549729"
+  },
+  {
+    "rank": 84,
+    "name": "자동차",
+    "change_pct": 12.0,
+    "stocks_count": "-1.26%",
+    "crawled_at": "2026-02-13T16:22:14.549749"
+  },
+  {
+    "rank": 85,
+    "name": "통신장비",
+    "change_pct": 54.0,
+    "stocks_count": "-1.27%",
+    "crawled_at": "2026-02-13T16:22:14.549762"
+  },
+  {
+    "rank": 86,
+    "name": "교육서비스",
+    "change_pct": 24.0,
+    "stocks_count": "-1.29%",
+    "crawled_at": "2026-02-13T16:22:14.549777"
+  },
+  {
+    "rank": 87,
+    "name": "건강관리기술",
+    "change_pct": 12.0,
+    "stocks_count": "-1.38%",
+    "crawled_at": "2026-02-13T16:22:14.549790"
+  },
+  {
+    "rank": 88,
+    "name": "철강",
+    "change_pct": 55.0,
+    "stocks_count": "-1.41%",
+    "crawled_at": "2026-02-13T16:22:14.549804"
+  },
+  {
+    "rank": 92,
+    "name": "전기장비",
+    "change_pct": 34.0,
+    "stocks_count": "-1.41%",
+    "crawled_at": "2026-02-13T16:22:14.549824"
+  },
+  {
+    "rank": 93,
+    "name": "건강관리장비와용품",
+    "change_pct": 102.0,
+    "stocks_count": "-1.47%",
+    "crawled_at": "2026-02-13T16:22:14.549837"
+  },
+  {
+    "rank": 94,
+    "name": "자동차부품",
+    "change_pct": 156.0,
+    "stocks_count": "-1.56%",
+    "crawled_at": "2026-02-13T16:22:14.549853"
+  },
+  {
+    "rank": 95,
+    "name": "게임엔터테인먼트",
+    "change_pct": 34.0,
+    "stocks_count": "-1.58%",
+    "crawled_at": "2026-02-13T16:22:14.549866"
+  },
+  {
+    "rank": 96,
+    "name": "출판",
+    "change_pct": 8.0,
+    "stocks_count": "-1.60%",
+    "crawled_at": "2026-02-13T16:22:14.549880"
+  },
+  {
+    "rank": 100,
+    "name": "문구류",
+    "change_pct": 1.0,
+    "stocks_count": "-1.62%",
+    "crawled_at": "2026-02-13T16:22:14.549899"
+  },
+  {
+    "rank": 101,
+    "name": "양방향미디어와서비스",
+    "change_pct": 17.0,
+    "stocks_count": "-1.66%",
+    "crawled_at": "2026-02-13T16:22:14.549913"
+  },
+  {
+    "rank": 102,
+    "name": "복합유틸리티",
+    "change_pct": 1.0,
+    "stocks_count": "-1.72%",
+    "crawled_at": "2026-02-13T16:22:14.549926"
+  },
+  {
+    "rank": 103,
+    "name": "디스플레이장비및부품",
+    "change_pct": 74.0,
+    "stocks_count": "-1.74%",
+    "crawled_at": "2026-02-13T16:22:14.549939"
+  },
+  {
+    "rank": 104,
+    "name": "손해보험",
+    "change_pct": 12.0,
+    "stocks_count": "-1.99%",
+    "crawled_at": "2026-02-13T16:22:14.549952"
+  },
+  {
+    "rank": 108,
+    "name": "건축제품",
+    "change_pct": 13.0,
+    "stocks_count": "-2.06%",
+    "crawled_at": "2026-02-13T16:22:14.549972"
+  },
+  {
+    "rank": 109,
+    "name": "사무용전자제품",
+    "change_pct": 1.0,
+    "stocks_count": "-2.09%",
+    "crawled_at": "2026-02-13T16:22:14.549985"
+  },
+  {
+    "rank": 110,
+    "name": "항공화물운송과물류",
+    "change_pct": 13.0,
+    "stocks_count": "-2.09%",
+    "crawled_at": "2026-02-13T16:22:14.549998"
+  },
+  {
+    "rank": 111,
+    "name": "화학",
+    "change_pct": 120.0,
+    "stocks_count": "-2.14%",
+    "crawled_at": "2026-02-13T16:22:14.550012"
+  },
+  {
+    "rank": 112,
+    "name": "복합기업",
+    "change_pct": 23.0,
+    "stocks_count": "-2.30%",
+    "crawled_at": "2026-02-13T16:22:14.550025"
+  },
+  {
+    "rank": 116,
+    "name": "디스플레이패널",
+    "change_pct": 5.0,
+    "stocks_count": "-2.33%",
+    "crawled_at": "2026-02-13T16:22:14.550048"
+  },
+  {
+    "rank": 117,
+    "name": "IT서비스",
+    "change_pct": 114.0,
+    "stocks_count": "-2.35%",
+    "crawled_at": "2026-02-13T16:22:14.550061"
+  },
+  {
+    "rank": 118,
+    "name": "핸드셋",
+    "change_pct": 58.0,
+    "stocks_count": "-2.50%",
+    "crawled_at": "2026-02-13T16:22:14.550074"
+  },
+  {
+    "rank": 119,
+    "name": "생물공학",
+    "change_pct": 60.0,
+    "stocks_count": "-2.57%",
+    "crawled_at": "2026-02-13T16:22:14.550089"
+  },
+  {
+    "rank": 120,
+    "name": "전자장비와기기",
+    "change_pct": 111.0,
+    "stocks_count": "-2.78%",
+    "crawled_at": "2026-02-13T16:22:14.550103"
+  },
+  {
+    "rank": 124,
+    "name": "비철금속",
+    "change_pct": 42.0,
+    "stocks_count": "-3.14%",
+    "crawled_at": "2026-02-13T16:22:14.550122"
+  },
+  {
+    "rank": 125,
+    "name": "전자제품",
+    "change_pct": 16.0,
+    "stocks_count": "-3.30%",
+    "crawled_at": "2026-02-13T16:22:14.550136"
+  },
+  {
+    "rank": 126,
+    "name": "무역회사와판매업체",
+    "change_pct": 7.0,
+    "stocks_count": "-3.50%",
+    "crawled_at": "2026-02-13T16:22:14.550153"
+  },
+  {
+    "rank": 127,
+    "name": "전기제품",
+    "change_pct": 71.0,
+    "stocks_count": "-3.73%",
+    "crawled_at": "2026-02-13T16:22:14.550166"
+  }
+]

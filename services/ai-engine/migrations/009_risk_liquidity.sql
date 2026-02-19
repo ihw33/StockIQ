@@ -1,0 +1,12 @@
+-- 009: 리스크/유동성 지표 확장 (US2Y, 2s10s Spread, HY Spread, MOVE, EWY, US30Y)
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS us2y_value NUMERIC(6,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS us2y_change_bps NUMERIC(8,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS spread_2s10s NUMERIC(8,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS us30y_value NUMERIC(6,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS us30y_change_bps NUMERIC(8,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS hy_spread_value NUMERIC(8,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS hy_spread_change_bps NUMERIC(8,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS move_value NUMERIC(8,2);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS move_change_pct NUMERIC(8,3);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS ewy_value NUMERIC(10,2);
+ALTER TABLE macro_daily ADD COLUMN IF NOT EXISTS ewy_change_pct NUMERIC(8,3);

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST() {
     try {
-        const pythonApiUrl = 'http://localhost:8001/api/strategy/morning-briefing';
+        const pythonApiUrl = `${process.env.AI_ENGINE_URL ?? 'http://localhost:8001'}/api/strategy/morning-briefing`;
 
         const response = await fetch(pythonApiUrl, {
             method: 'POST',

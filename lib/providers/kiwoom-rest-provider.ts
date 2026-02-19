@@ -178,7 +178,7 @@ export class KiwoomRestProvider implements StockProvider {
             } else if (interval === 'W') {
                 apiId = 'ka10082'; // Weekly
                 requestBody.base_dt = dateStr;
-                responseListKey = 'stk_week_pole_chart_qry';
+                responseListKey = 'stk_stk_pole_chart_qry';
             } else if (interval === 'M') {
                 apiId = 'ka10083'; // Monthly
                 requestBody.base_dt = dateStr;

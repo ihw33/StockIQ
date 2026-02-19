@@ -5,548 +5,27 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, BarChart, Bar, ReferenceLine, Cell
 } from 'recharts';
-import { RefreshCw, TrendingUp, TrendingDown, Minus, CheckCircle, AlertTriangle, Sparkles, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertTriangle, Sparkles, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import type {
+    MacroScore,
+    GlobalMarketItem,
+    GlobalMarkets,
+    KrwUsdItem,
+    RiskIndicators,
+    MacroData,
+    EconomicEvent,
+    DailyReview
+} from './types';
+import { safetyBadge } from './utils';
+import { ZoneGauge } from './components/zone-gauge';
+import { LlmBriefingContent } from './components/llm-briefing-content';
+import { MarketCard } from './components/market-card';
+import { RiskCard } from './components/risk-card';
+import { ScoreCard } from './components/score-card';
+import { DailyReviewCard } from './components/daily-review-card';
+import { EconomicCalendarBanner } from './components/economic-calendar-banner';
+import { DateStrip } from './components/date-strip';
 
-// ─── Types ───────────────────────────────────────────────
-interface MacroScore {
-    value?: number | null;
-    change_pct?: number;
-    change_bps?: number;
-    score: number;
-    net_amount?: number;
-    net?: number;
-    volume?: number;
-}
-
-interface GlobalMarketItem {
-    value: number | null;
-    change_pct: number;
-}
-
-interface GlobalMarkets {
-    nasdaq: GlobalMarketItem;
-    sp500: GlobalMarketItem;
-    oil: GlobalMarketItem;
-    gold: GlobalMarketItem;
-    bitcoin: GlobalMarketItem;
-    krw_usd: KrwUsdItem;
-}
-
-interface KrwUsdItem {
-    value: number | null;
-    change: number;
-    change_pct: number;
-}
-
-interface MacroData {
-    date: string;
-    kr_market_day?: string;
-    us_market_date?: string;
-    us_market_day?: string;
-    global_markets?: GlobalMarkets;
-    tier_a: {
-        dxy: MacroScore;
-        us10y: MacroScore;
-        vix: MacroScore;
-    };
-    tier_b: {
-        foreign_cash: MacroScore;
-        futures: MacroScore;
-        short_selling: MacroScore;
-    };
-    overall_score: number;
-    safety_level: 1 | 2 | 3;
-    prediction_direction: string;
-    interpretation: string;
-    chain_analysis?: string;
-    llm_analysis?: string;
-    news_context?: string;
-}
-
-interface DailyReview {
-    date: string;
-    prediction: {
-        direction: string;
-        overall_score: number;
-        safety_level: number;
-        level_label: string;
-        summary: string;
-    };
-    actual: {
-        kospi_change: number;
-        foreign_net: number;
-        direction: string;
-    };
-    evaluation: {
-        hit: boolean;
-        label: string;
-        comment: string;
-    };
-}
-
-// ─── Score UI Helpers ────────────────────────────────────
-function scoreColor(score: number): string {
-    if (score <= -2) return 'text-red-400';
-    if (score === -1) return 'text-red-300';
-    if (score === 0) return 'text-slate-400';
-    if (score === 1) return 'text-emerald-300';
-    return 'text-emerald-400';
-}
-
-function scoreBg(score: number): string {
-    if (score <= -2) return 'bg-red-500/10 border-red-500/30';
-    if (score === -1) return 'bg-red-500/5 border-red-500/20';
-    if (score === 0) return 'bg-slate-800 border-slate-700';
-    if (score === 1) return 'bg-emerald-500/5 border-emerald-500/20';
-    return 'bg-emerald-500/10 border-emerald-500/30';
-}
-
-function scoreIcon(score: number) {
-    if (score > 0) return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
-    if (score < 0) return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
-    return <Minus className="w-3.5 h-3.5 text-slate-500" />;
-}
-
-function safetyBadge(level: number) {
-    const styles = {
-        1: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-        2: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-        3: 'bg-red-500/20 text-red-300 border-red-500/30',
-    };
-    const labels = {
-        1: '🟢 Level 1: 외국인 우호적',
-        2: '🟡 Level 2: 중립/관망',
-        3: '🔴 Level 3: 외국인 이탈 경고',
-    };
-    return (
-        <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border ${styles[level as keyof typeof styles] || styles[2]}`}>
-            {labels[level as keyof typeof labels] || labels[2]}
-        </span>
-    );
-}
-
-// ─── Zone Gauge (안전구간 시각화) ────────────────────────
-// 각 지표별 구간 정의: [매우위험, 위험, 중립, 안전, 매우안전] 경계값
-// position: 0(최악)~100(최선) 로 정규화
-type ZoneConfig = {
-    zones: { min: number; max: number; color: string; label: string }[];
-    normalize: (val: number) => number; // 값 → 0~100 위치
-    unit: string;
-    ticks: { pos: number; label: string }[];
-};
-
-const ZONE_CONFIGS: Record<string, ZoneConfig> = {
-    dxy_change: {
-        zones: [
-            { min: 0, max: 15, color: 'bg-red-500', label: '급등' },
-            { min: 15, max: 35, color: 'bg-red-400/60', label: '상승' },
-            { min: 35, max: 65, color: 'bg-slate-500', label: '보합' },
-            { min: 65, max: 85, color: 'bg-emerald-400/60', label: '하락' },
-            { min: 85, max: 100, color: 'bg-emerald-500', label: '급락' },
-        ],
-        normalize: (v) => Math.max(0, Math.min(100, 50 - v * 25)),  // +2%→0, 0→50, -2%→100
-        unit: '%',
-        ticks: [{ pos: 15, label: '+1.5%' }, { pos: 35, label: '+0.5%' }, { pos: 65, label: '-0.5%' }, { pos: 85, label: '-1.5%' }],
-    },
-    us10y_change: {
-        zones: [
-            { min: 0, max: 15, color: 'bg-red-500', label: '급등' },
-            { min: 15, max: 35, color: 'bg-red-400/60', label: '상승' },
-            { min: 35, max: 65, color: 'bg-slate-500', label: '보합' },
-            { min: 65, max: 85, color: 'bg-emerald-400/60', label: '하락' },
-            { min: 85, max: 100, color: 'bg-emerald-500', label: '급락' },
-        ],
-        normalize: (v) => Math.max(0, Math.min(100, 50 - v * 3.33)),  // +15bp→0, 0→50, -15bp→100
-        unit: 'bp',
-        ticks: [{ pos: 15, label: '+10bp' }, { pos: 35, label: '+3bp' }, { pos: 65, label: '-3bp' }, { pos: 85, label: '-10bp' }],
-    },
-    vix_level: {
-        zones: [
-            { min: 0, max: 15, color: 'bg-red-500', label: '패닉' },
-            { min: 15, max: 30, color: 'bg-red-400/60', label: '불안' },
-            { min: 30, max: 60, color: 'bg-slate-500', label: '정상' },
-            { min: 60, max: 80, color: 'bg-emerald-400/60', label: '안정' },
-            { min: 80, max: 100, color: 'bg-emerald-500', label: '낙관' },
-        ],
-        normalize: (v) => Math.max(0, Math.min(100, (35 - v) * 2.86)),  // VIX 35→0, 20→43, 10→71, 0→100
-        unit: '',
-        ticks: [{ pos: 15, label: '30' }, { pos: 30, label: '25' }, { pos: 60, label: '15' }, { pos: 80, label: '12' }],
-    },
-    foreign: {
-        zones: [
-            { min: 0, max: 10, color: 'bg-red-500', label: '대량매도' },
-            { min: 10, max: 35, color: 'bg-red-400/60', label: '매도' },
-            { min: 35, max: 65, color: 'bg-slate-500', label: '중립' },
-            { min: 65, max: 90, color: 'bg-emerald-400/60', label: '매수' },
-            { min: 90, max: 100, color: 'bg-emerald-500', label: '대량매수' },
-        ],
-        normalize: (v) => Math.max(0, Math.min(100, 50 + v / 100)),  // -5000→0, 0→50, +5000→100
-        unit: '억',
-        ticks: [{ pos: 10, label: '-5천' }, { pos: 35, label: '-500' }, { pos: 65, label: '+500' }, { pos: 90, label: '+5천' }],
-    },
-    futures: {
-        zones: [
-            { min: 0, max: 10, color: 'bg-red-500', label: '대량매도' },
-            { min: 10, max: 35, color: 'bg-red-400/60', label: '매도' },
-            { min: 35, max: 65, color: 'bg-slate-500', label: '중립' },
-            { min: 65, max: 90, color: 'bg-emerald-400/60', label: '매수' },
-            { min: 90, max: 100, color: 'bg-emerald-500', label: '대량매수' },
-        ],
-        normalize: (v) => Math.max(0, Math.min(100, 50 + v / 250)),  // -12500→0, 0→50, +12500→100
-        unit: '계약',
-        ticks: [{ pos: 10, label: '-1만' }, { pos: 35, label: '-2천' }, { pos: 65, label: '+2천' }, { pos: 90, label: '+1만' }],
-    },
-    short_change: {
-        zones: [
-            { min: 0, max: 10, color: 'bg-red-500', label: '급증' },
-            { min: 10, max: 35, color: 'bg-red-400/60', label: '증가' },
-            { min: 35, max: 65, color: 'bg-slate-500', label: '보합' },
-            { min: 65, max: 90, color: 'bg-emerald-400/60', label: '감소' },
-            { min: 90, max: 100, color: 'bg-emerald-500', label: '급감' },
-        ],
-        normalize: (v) => Math.max(0, Math.min(100, 50 - v * 1.25)),  // +40→0, 0→50, -40→100
-        unit: '%',
-        ticks: [{ pos: 10, label: '+30%' }, { pos: 35, label: '+10%' }, { pos: 65, label: '-10%' }, { pos: 90, label: '-30%' }],
-    },
-};
-
-function ZoneGauge({ zoneKey, rawValue }: { zoneKey: string; rawValue: number }) {
-    const config = ZONE_CONFIGS[zoneKey];
-    if (!config) return null;
-
-    const pos = config.normalize(rawValue);
-    // 현재 위치가 어느 zone에 있는지
-    const currentZone = config.zones.find(z => pos >= z.min && pos < z.max) || config.zones[2];
-
-    return (
-        <div className="mt-2.5 pt-2 border-t border-slate-700/50">
-            {/* Zone label */}
-            <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-slate-500">안전 구간</span>
-                <span className={`text-[10px] font-bold ${
-                    currentZone.color.includes('red') ? 'text-red-400' :
-                    currentZone.color.includes('emerald') ? 'text-emerald-400' : 'text-slate-400'
-                }`}>
-                    {currentZone.label}
-                </span>
-            </div>
-            {/* 5-zone bar */}
-            <div className="relative w-full h-2 rounded-full flex overflow-hidden">
-                {config.zones.map((zone, i) => (
-                    <div
-                        key={i}
-                        className={`h-full ${zone.color} ${i === 0 ? 'rounded-l-full' : ''} ${i === config.zones.length - 1 ? 'rounded-r-full' : ''}`}
-                        style={{ width: `${zone.max - zone.min}%` }}
-                    />
-                ))}
-                {/* Needle / indicator */}
-                <div
-                    className="absolute top-[-2px] w-[3px] h-[12px] bg-white rounded-full shadow-[0_0_4px_rgba(255,255,255,0.8)]"
-                    style={{ left: `calc(${pos}% - 1.5px)` }}
-                />
-            </div>
-            {/* Tick labels */}
-            <div className="relative w-full h-3 mt-0.5">
-                {config.ticks.map((tick, i) => (
-                    <span
-                        key={i}
-                        className="absolute text-[8px] text-slate-600 -translate-x-1/2"
-                        style={{ left: `${tick.pos}%` }}
-                    >
-                        {tick.label}
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ─── LLM Briefing Renderer ───────────────────────────────
-function formatTextParts(text: string) {
-    const parts = text.split(/(\*\*.*?\*\*)/g);
-    return parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={i} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
-        }
-        return <span key={i}>{part}</span>;
-    });
-}
-
-function LlmBriefingContent({ content }: { content: string }) {
-    return (
-        <div className="space-y-1">
-            {content.split('\n').map((line, i) => {
-                const trimmed = line.trim();
-                if (!trimmed) return <div key={i} className="h-2" />;
-
-                if (trimmed.startsWith('### ')) {
-                    return (
-                        <h4 key={i} className="text-purple-300 font-bold mt-4 mb-1 text-sm flex items-center gap-2">
-                            {formatTextParts(trimmed.slice(4))}
-                        </h4>
-                    );
-                }
-                if (trimmed.startsWith('## ')) {
-                    return (
-                        <h3 key={i} className="text-purple-200 font-bold mt-5 mb-2 text-base">
-                            {formatTextParts(trimmed.slice(3))}
-                        </h3>
-                    );
-                }
-                if (trimmed.startsWith('# ')) {
-                    return (
-                        <h2 key={i} className="text-purple-100 font-bold mt-5 mb-2 text-lg">
-                            {formatTextParts(trimmed.slice(2))}
-                        </h2>
-                    );
-                }
-                if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-                    return (
-                        <div key={i} className="flex gap-2 ml-2">
-                            <span className="text-purple-400 shrink-0">·</span>
-                            <span className="text-slate-300 text-sm">{formatTextParts(trimmed.slice(2))}</span>
-                        </div>
-                    );
-                }
-                if (/^\d+\.\s/.test(trimmed)) {
-                    const match = trimmed.match(/^(\d+\.)\s(.*)$/);
-                    return (
-                        <div key={i} className="flex gap-2 ml-2">
-                            <span className="text-purple-400 shrink-0 text-xs font-mono">{match?.[1]}</span>
-                            <span className="text-slate-300 text-sm">{formatTextParts(match?.[2] || trimmed)}</span>
-                        </div>
-                    );
-                }
-                if (trimmed.startsWith('> ')) {
-                    return (
-                        <div key={i} className="border-l-2 border-purple-500/50 pl-3 ml-2 text-slate-400 text-sm italic">
-                            {formatTextParts(trimmed.slice(2))}
-                        </div>
-                    );
-                }
-                if (trimmed.startsWith('---') || trimmed.startsWith('***')) {
-                    return <hr key={i} className="border-slate-700/50 my-3" />;
-                }
-                return (
-                    <p key={i} className="text-slate-300 text-sm leading-relaxed">
-                        {formatTextParts(trimmed)}
-                    </p>
-                );
-            })}
-        </div>
-    );
-}
-
-// ─── Market Card (Global Markets) ────────────────────────
-function MarketCard({ label, icon, value, changePct, unit }: {
-    label: string;
-    icon: string;
-    value: string;
-    changePct: number;
-    unit?: string;
-}) {
-    const isPositive = changePct > 0;
-    const isNegative = changePct < 0;
-    const colorClass = isPositive ? 'text-emerald-400' : isNegative ? 'text-red-400' : 'text-slate-400';
-    const bgClass = isPositive ? 'bg-emerald-500/5 border-emerald-500/20' : isNegative ? 'bg-red-500/5 border-red-500/20' : 'bg-slate-800 border-slate-700';
-
-    return (
-        <div className={`rounded-lg border p-3 ${bgClass}`}>
-            <div className="text-lg mb-1">{icon}</div>
-            <div className="text-[10px] text-slate-500 mb-1">{label}</div>
-            <div className="text-sm font-bold text-white">{value}{unit || ''}</div>
-            <div className={`text-xs font-mono mt-0.5 ${colorClass}`}>
-                {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%
-            </div>
-        </div>
-    );
-}
-
-// ─── Score Card ──────────────────────────────────────────
-function ScoreCard({ label, icon, value, subValue, unit, score, accuracy, zoneKey, rawValue }: {
-    label: string;
-    icon: string;
-    value: string;
-    subValue: string;
-    unit?: string;
-    score: number;
-    accuracy?: number;
-    zoneKey?: string;
-    rawValue?: number;
-}) {
-    return (
-        <div className={`rounded-lg border p-4 ${scoreBg(score)}`}>
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-lg">{icon}</span>
-                <div className="flex items-center gap-1">
-                    {scoreIcon(score)}
-                    <span className={`text-sm font-bold ${scoreColor(score)}`}>{score > 0 ? '+' : ''}{score}</span>
-                </div>
-            </div>
-            <div className="text-xs text-slate-500 mb-1">{label}</div>
-            <div className="text-lg font-bold text-white">{value}</div>
-            <div className="text-xs text-slate-400 mt-0.5">{subValue}{unit}</div>
-
-            {/* Zone Gauge */}
-            {zoneKey && rawValue !== undefined && <ZoneGauge zoneKey={zoneKey} rawValue={rawValue} />}
-
-            {accuracy !== undefined && (
-                <div className="mt-2 pt-2 border-t border-slate-700/50">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-slate-500">적중률</span>
-                        <span className="text-xs font-medium text-slate-300">{(accuracy * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full bg-slate-700 rounded-full h-1 mt-1">
-                        <div
-                            className={`h-1 rounded-full ${accuracy >= 0.7 ? 'bg-emerald-400' : accuracy >= 0.5 ? 'bg-amber-400' : 'bg-red-400'}`}
-                            style={{ width: `${accuracy * 100}%` }}
-                        />
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ─── Daily Review Card ───────────────────────────────────
-function DailyReviewCard({ review }: { review: DailyReview }) {
-    return (
-        <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-5 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-                <span className="text-base font-bold text-white">📋 전일 리뷰</span>
-                <span className="text-xs text-slate-500">({review.date})</span>
-                <span className={`ml-auto px-2 py-0.5 rounded text-xs font-bold ${review.evaluation.hit ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
-                    {review.evaluation.label}
-                </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                {/* Prediction */}
-                <div>
-                    <div className="text-xs text-slate-500 mb-1">예측</div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-slate-200">
-                            {review.prediction.level_label}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                            ({review.prediction.overall_score >= 0 ? '+' : ''}{review.prediction.overall_score.toFixed(2)})
-                        </span>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                        {review.prediction.summary}
-                    </p>
-                </div>
-
-                {/* Actual */}
-                <div>
-                    <div className="text-xs text-slate-500 mb-1">실제</div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <span className={`text-sm font-bold ${review.actual.kospi_change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            KOSPI {review.actual.kospi_change >= 0 ? '+' : ''}{review.actual.kospi_change.toFixed(1)}%
-                        </span>
-                        <span className="text-xs text-slate-400">
-                            외국인 {review.actual.foreign_net >= 0 ? '+' : ''}{review.actual.foreign_net.toLocaleString()}억
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Evaluation */}
-            <div className="mt-3 pt-3 border-t border-slate-800">
-                <div className="flex items-start gap-2">
-                    {review.evaluation.hit
-                        ? <CheckCircle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                        : <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                    }
-                    <p className="text-xs text-slate-300 leading-relaxed">{review.evaluation.comment}</p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── Date Strip (가로 날짜 네비게이션) ─────────────────────
-const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
-
-function DateStrip({
-    availableDates, selectedDate, onSelectDate
-}: {
-    availableDates: {date: string; score: number; safety_level: number; has_llm: boolean}[];
-    selectedDate: string | null;
-    onSelectDate: (date: string | null) => void;
-}) {
-    const today = new Date().toISOString().slice(0, 10);
-    const dateMap = new Map(availableDates.map(d => [d.date, d]));
-
-    // 최근 14일 생성 (오늘 포함)
-    const days: string[] = [];
-    for (let i = 13; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().slice(0, 10));
-    }
-
-    return (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-            {days.map((dateStr) => {
-                const info = dateMap.get(dateStr);
-                const isToday = dateStr === today;
-                const isSelected = dateStr === selectedDate || (selectedDate === null && isToday);
-                const hasData = !!info;
-                const hasLlm = info?.has_llm || false;
-
-                const d = new Date(dateStr + 'T00:00:00');
-                const dayNum = d.getDate();
-                const dayName = DAY_NAMES[d.getDay()];
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-
-                const safetyBorder = info
-                    ? info.safety_level === 1 ? 'border-emerald-500/60' : info.safety_level === 3 ? 'border-red-500/60' : 'border-amber-500/60'
-                    : 'border-slate-700/50';
-
-                return (
-                    <button
-                        key={dateStr}
-                        onClick={() => {
-                            if (isToday) onSelectDate(null);
-                            else onSelectDate(dateStr);
-                        }}
-                        className={`relative flex flex-col items-center shrink-0 w-12 py-1.5 rounded-lg border transition-all cursor-pointer
-                            ${isSelected
-                                ? 'bg-blue-600/20 border-blue-500 text-white'
-                                : hasData
-                                    ? `bg-slate-800/50 ${safetyBorder} text-slate-300 hover:bg-slate-700/50`
-                                    : 'bg-slate-900/20 border-slate-800/30 text-slate-600 hover:bg-slate-800/30'
-                            }
-                        `}
-                    >
-                        <span className={`text-[9px] leading-none ${isWeekend && !isSelected ? 'text-slate-600' : ''}`}>
-                            {dayName}
-                        </span>
-                        <span className={`text-sm font-bold leading-tight mt-0.5 ${isSelected ? 'text-white' : ''}`}>
-                            {dayNum}
-                        </span>
-                        {/* 하단 인디케이터 */}
-                        <div className="flex items-center gap-0.5 mt-0.5 h-1.5">
-                            {hasData && (
-                                <span className={`w-1 h-1 rounded-full ${
-                                    info!.safety_level === 1 ? 'bg-emerald-400' :
-                                    info!.safety_level === 3 ? 'bg-red-400' : 'bg-amber-400'
-                                }`} />
-                            )}
-                            {hasLlm && (
-                                <span className="w-1 h-1 rounded-full bg-purple-400" />
-                            )}
-                        </div>
-                        {isToday && !isSelected && (
-                            <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-400" />
-                        )}
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
 
 // ─── Main Component ──────────────────────────────────────
 export function MacroDashboard() {
@@ -558,6 +37,8 @@ export function MacroDashboard() {
     const [loading, setLoading] = useState(true);
     const [collecting, setCollecting] = useState(false);
     const [llmOpen, setLlmOpen] = useState(false);
+    const [llmPmOpen, setLlmPmOpen] = useState(false);
+    const [yesterdayTierB, setYesterdayTierB] = useState<any>(null);
     const [selectedBriefingDate, setSelectedBriefingDate] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<string | null>(null); // null = today
     const [dateData, setDateData] = useState<MacroData | null>(null);
@@ -573,6 +54,7 @@ export function MacroDashboard() {
             if (json.data) setData(json.data);
             if (json.daily_review) setReview(json.daily_review);
             if (json.accuracy) setAccuracy(json.accuracy);
+            if (json.yesterday_tier_b) setYesterdayTierB(json.yesterday_tier_b);
         } catch (e) {
             console.error('Macro fetch error:', e);
         }
@@ -626,7 +108,11 @@ export function MacroDashboard() {
     const handleCollect = async () => {
         setCollecting(true);
         try {
-            const res = await fetch('/api/macro', { method: 'POST' });
+            const res = await fetch('/api/macro', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'manual' }),
+            });
             const json = await res.json();
             if (json.data) setData(json.data);
             await fetchHistory();
@@ -634,6 +120,25 @@ export function MacroDashboard() {
             console.error('Collect error:', e);
         } finally {
             setCollecting(false);
+        }
+    };
+
+    const [generatingBriefing, setGeneratingBriefing] = useState(false);
+
+    const handleGenerateBriefing = async () => {
+        setGeneratingBriefing(true);
+        try {
+            const res = await fetch('/api/macro', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}), // mode 제거 - 백엔드에서 시간별 자동 선택
+            });
+            const json = await res.json();
+            if (json.data) setData(json.data);
+        } catch (e) {
+            console.error('Briefing generate error:', e);
+        } finally {
+            setGeneratingBriefing(false);
         }
     };
 
@@ -750,6 +255,11 @@ export function MacroDashboard() {
                 )}
             </div>
 
+            {/* Economic Calendar — 공지사항 배너 */}
+            {displayData?.economic_calendar?.economic_events && displayData.economic_calendar.economic_events.length > 0 && (
+                <EconomicCalendarBanner events={displayData.economic_calendar.economic_events} />
+            )}
+
             {/* 선택한 날짜에 데이터가 없는 경우 */}
             {isViewingPast && !displayData && !loadingDate && (
                 <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-8 text-center">
@@ -801,6 +311,49 @@ export function MacroDashboard() {
 
             {/* Daily Review */}
             {displayReview && <DailyReviewCard review={displayReview} />}
+
+            {/* Parse chain analysis into sections */}
+            {(() => {
+                const ca = displayData.chain_analysis || '';
+                const sections: Record<string, string> = {};
+                if (ca) {
+                    const sectionRegex = /\[\s*(\d+)\.\s*([^\]]+)\]/g;
+                    const summaryRegex = /\[\s*종합[^\]]*\]/;
+                    const parts = ca.split(/(?=\[\s*\d+\.\s*)/);
+                    for (const part of parts) {
+                        const m = part.match(/\[\s*(\d+)\.\s*([^\]]+)\]/);
+                        if (m) {
+                            const lines = part.split('\n').slice(1).filter(l => l.trim()).map(l => l.trim());
+                            sections[m[1]] = lines.join('\n');
+                        }
+                    }
+                    // Extract 종합 + 대응 구간
+                    const summaryIdx = ca.indexOf('[ 종합');
+                    if (summaryIdx >= 0) sections['summary'] = ca.slice(summaryIdx);
+                    else {
+                        const lastDash = ca.lastIndexOf('━━━');
+                        if (lastDash >= 0 && ca.indexOf('선별적 대응') > 0) {
+                            const actionIdx = ca.lastIndexOf('━━━', ca.indexOf('선별적 대응'));
+                            if (actionIdx >= 0) sections['summary'] = ca.slice(actionIdx);
+                        }
+                    }
+                }
+
+                const ChainSnippet = ({ text }: { text: string }) => (
+                    <div className="mt-2 rounded border border-blue-900/30 bg-blue-950/10 px-3 py-2">
+                        <div className="text-[13px] text-slate-400 leading-relaxed">
+                            {text.split('\n').map((line, i) => {
+                                const t = line.trim();
+                                if (t.startsWith('→')) return <div key={i} className="text-slate-500 ml-2">{t}</div>;
+                                if (t.startsWith('(근거:')) return <div key={i} className="text-slate-600 ml-2 text-[12px]">{t}</div>;
+                                if (t) return <div key={i}>{t}</div>;
+                                return null;
+                            })}
+                        </div>
+                    </div>
+                );
+
+                return (<>
 
             {/* Global Markets */}
             {displayData.global_markets && (
@@ -857,6 +410,7 @@ export function MacroDashboard() {
                             />
                         )}
                     </div>
+                    {sections['2'] && <ChainSnippet text={sections['2']} />}
                 </div>
             )}
 
@@ -900,7 +454,144 @@ export function MacroDashboard() {
                         rawValue={displayData.tier_a.vix.value || 20}
                     />
                 </div>
+                {(sections['1'] || sections['3'] || sections['4']) && (
+                    <ChainSnippet text={[sections['1'], sections['3'], sections['4']].filter(Boolean).join('\n')} />
+                )}
             </div>
+
+            {/* Risk / Liquidity Indicators (Tier A+) */}
+            {displayData.risk_indicators && (
+                <div>
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                        리스크 / 유동성 지표
+                        <span className="ml-2 text-[10px] font-normal normal-case text-slate-600">(LLM 참고용)</span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {/* US 2Y + 2s10s Spread */}
+                        <RiskCard
+                            label="US 2Y + 2s10s"
+                            desc="단기금리 + 장단기 스프레드 (역전 시 침체 신호)"
+                            value={displayData.risk_indicators.us2y?.value != null ? `${displayData.risk_indicators.us2y.value.toFixed(2)}%` : '-'}
+                            subValue={(() => {
+                                const bps = displayData.risk_indicators.us2y?.change_bps || 0;
+                                const spread = displayData.risk_indicators.spread_2s10s;
+                                const spreadStr = spread != null ? ` | 2s10s ${spread > 0 ? '+' : ''}${spread.toFixed(0)}bp` : '';
+                                return `${bps >= 0 ? '+' : ''}${bps.toFixed(1)}bp${spreadStr}`;
+                            })()}
+                            subColor={(() => {
+                                const spread = displayData.risk_indicators.spread_2s10s;
+                                if (spread != null && spread < 0) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                        {/* HY Spread */}
+                        <RiskCard
+                            label="HY Spread (하이일드)"
+                            desc="회사채 위험 프리미엄 (400bp↑ 위험회피, 600bp↑ 신용경색)"
+                            value={displayData.risk_indicators.hy_spread?.value != null ? `${displayData.risk_indicators.hy_spread.value.toFixed(0)}bp` : '-'}
+                            subValue={`${(displayData.risk_indicators.hy_spread?.change_bps || 0) >= 0 ? '+' : ''}${(displayData.risk_indicators.hy_spread?.change_bps || 0).toFixed(1)}bp`}
+                            subColor={(() => {
+                                const v = displayData.risk_indicators.hy_spread?.value;
+                                if (v != null && v >= 400) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                        {/* MOVE Index */}
+                        <RiskCard
+                            label="MOVE (채권 변동성)"
+                            desc="채권판 VIX (120↑ 금리 급변 경계)"
+                            value={displayData.risk_indicators.move?.value != null ? displayData.risk_indicators.move.value.toFixed(1) : '-'}
+                            subValue={`${(displayData.risk_indicators.move?.change_pct || 0) >= 0 ? '+' : ''}${(displayData.risk_indicators.move?.change_pct || 0).toFixed(2)}%`}
+                            subColor={(() => {
+                                const v = displayData.risk_indicators.move?.value;
+                                if (v != null && v >= 120) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                        {/* EWY */}
+                        <RiskCard
+                            label="EWY (MSCI Korea ETF)"
+                            desc="외국인이 보는 한국시장 대리지표"
+                            value={displayData.global_markets?.ewy?.value != null ? `$${displayData.global_markets.ewy.value.toFixed(2)}` : '-'}
+                            subValue={`${(displayData.global_markets?.ewy?.change_pct || 0) >= 0 ? '+' : ''}${(displayData.global_markets?.ewy?.change_pct || 0).toFixed(2)}%`}
+                            subColor={(() => {
+                                const chg = displayData.global_markets?.ewy?.change_pct || 0;
+                                if (chg > 0.5) return 'green';
+                                if (chg < -0.5) return 'red';
+                                return 'neutral';
+                            })()}
+                        />
+                    </div>
+                    {(() => {
+                        const ri = displayData.risk_indicators;
+                        const ewy = displayData.global_markets?.ewy;
+                        const lines: string[] = [];
+                        // 2s10s
+                        const spread = ri.spread_2s10s;
+                        if (spread != null) {
+                            if (spread < 0) lines.push(`2s10s 스프레드 ${spread.toFixed(0)}bp 역전 — 경기 침체 신호, 방어적 포지션 필요.`);
+                            else if (spread < 30) lines.push(`2s10s 스프레드 ${spread.toFixed(0)}bp로 평탄화 진행 중 — 경기 둔화 우려 주시.`);
+                            else lines.push(`2s10s 스프레드 ${spread.toFixed(0)}bp 정상 범위 — 수익률 곡선 건전, 침체 신호 없음.`);
+                        }
+                        // HY
+                        const hy = ri.hy_spread?.value;
+                        if (hy != null) {
+                            if (hy >= 600) lines.push(`HY 스프레드 ${hy.toFixed(0)}bp — 신용경색 구간, 위험자산 회피 강화.`);
+                            else if (hy >= 400) lines.push(`HY 스프레드 ${hy.toFixed(0)}bp — 위험회피 심화, 신용 리스크 경계.`);
+                            else lines.push(`HY 스프레드 ${hy.toFixed(0)}bp — ${hy < 300 ? '매우 양호한' : '안정적인'} 신용 환경.`);
+                        }
+                        // MOVE
+                        const mv = ri.move?.value;
+                        if (mv != null) {
+                            if (mv >= 120) lines.push(`MOVE ${mv.toFixed(0)} — 채권 변동성 경계 구간, 금리 급변 리스크 주의.`);
+                            else lines.push(`MOVE ${mv.toFixed(0)} — 채권 변동성 정상 범위, 금리 급변 리스크 낮음.`);
+                        }
+                        // EWY
+                        if (ewy?.change_pct != null) {
+                            const chg = ewy.change_pct;
+                            if (chg > 1) lines.push(`EWY ${chg > 0 ? '+' : ''}${chg.toFixed(1)}% — 외국인 한국 투자 심리 긍정적.`);
+                            else if (chg < -1) lines.push(`EWY ${chg.toFixed(1)}% — 외국인 한국 투자 심리 위축.`);
+                            else lines.push(`EWY ${chg > 0 ? '+' : ''}${chg.toFixed(1)}% — 외국인 시각 중립.`);
+                        }
+                        return lines.length > 0 ? <ChainSnippet text={lines.join('\n')} /> : null;
+                    })()}
+                </div>
+            )}
+
+            {/* 전일 마감 잔고 (Yesterday Tier B) */}
+            {yesterdayTierB && !isViewingPast && (
+                <div>
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                        전일 마감 잔고
+                        <span className="ml-2 text-[10px] font-normal normal-case text-slate-600">
+                            ({yesterdayTierB.date})
+                        </span>
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-900/20 p-3">
+                            <div className="text-[10px] text-slate-500 mb-1">외국인 현물</div>
+                            <div className={`text-sm font-bold ${(yesterdayTierB.foreign_cash?.net_amount || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(yesterdayTierB.foreign_cash?.net_amount || 0) >= 0 ? '+' : ''}{(yesterdayTierB.foreign_cash?.net_amount || 0).toLocaleString()}억
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">스코어: {yesterdayTierB.foreign_cash?.score ?? '-'}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-900/20 p-3">
+                            <div className="text-[10px] text-slate-500 mb-1">외국인 선물</div>
+                            <div className={`text-sm font-bold ${(yesterdayTierB.futures?.net || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(yesterdayTierB.futures?.net || 0) >= 0 ? '+' : ''}{(yesterdayTierB.futures?.net || 0).toLocaleString()}계약
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">스코어: {yesterdayTierB.futures?.score ?? '-'}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-900/20 p-3">
+                            <div className="text-[10px] text-slate-500 mb-1">공매도 변동</div>
+                            <div className={`text-sm font-bold ${(yesterdayTierB.short_selling?.change_pct || 0) <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(yesterdayTierB.short_selling?.change_pct || 0) >= 0 ? '+' : ''}{(yesterdayTierB.short_selling?.change_pct || 0).toFixed(1)}%
+                            </div>
+                            <div className="text-[10px] text-slate-600 mt-0.5">스코어: {yesterdayTierB.short_selling?.score ?? '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Tier B: Flow */}
             <div>
@@ -939,17 +630,18 @@ export function MacroDashboard() {
                         rawValue={displayData.tier_b.short_selling.change_pct || 0}
                     />
                 </div>
+                {sections['5'] && <ChainSnippet text={sections['5']} />}
             </div>
 
-            {/* Chain Analysis */}
-            {displayData.chain_analysis && (
+            {/* Chain Analysis — Summary only */}
+            {sections['summary'] && (
                 <div className="rounded-lg border border-blue-900/50 bg-blue-950/20 p-5">
                     <h3 className="text-sm font-bold text-blue-300 mb-3 flex items-center gap-2">
                         <span>⚙️</span>
-                        <span>연쇄 분석: 오늘의 자금 흐름</span>
+                        <span>종합 분석</span>
                     </h3>
                     <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line font-mono">
-                        {displayData.chain_analysis.split('\n').map((line, i) => {
+                        {sections['summary'].split('\n').map((line, i) => {
                             const trimmed = line.trimStart();
                             // Section headers
                             if (trimmed.startsWith('[ ') || trimmed.startsWith('━━━')) {
@@ -1008,22 +700,32 @@ export function MacroDashboard() {
                 </div>
             )}
 
-            {/* LLM Team Briefing */}
+                </>);
+            })()}
+
+            {/* AM 예측 브리핑 */}
             <div className="rounded-lg border border-purple-900/50 bg-purple-950/20 p-5">
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-purple-300 flex items-center gap-2">
                         <Sparkles className="w-4 h-4" />
-                        LLM 팀 브리핑
+                        AM 예측 브리핑
+                        {displayData.collected_at_am ? (
+                            <span className="text-xs font-medium text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">
+                                {new Date(displayData.collected_at_am).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-normal text-purple-400/60">자동 07:00 / 18:00</span>
+                        )}
                     </h3>
                     <div className="flex items-center gap-2">
-                        {!displayData.llm_analysis && (
+                        {!isViewingPast && (
                             <button
-                                onClick={handleCollect}
-                                disabled={collecting}
+                                onClick={handleGenerateBriefing}
+                                disabled={generatingBriefing}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 text-white rounded-lg transition-colors"
                             >
-                                <Sparkles className={`w-3 h-3 ${collecting ? 'animate-spin' : ''}`} />
-                                {collecting ? '생성 중...' : '브리핑 생성'}
+                                <Sparkles className={`w-3 h-3 ${generatingBriefing ? 'animate-spin' : ''}`} />
+                                {generatingBriefing ? '생성 중...' : displayData.llm_analysis ? '재생성' : '브리핑 생성'}
                             </button>
                         )}
                         {displayData.llm_analysis && (
@@ -1037,12 +739,12 @@ export function MacroDashboard() {
                         )}
                     </div>
                 </div>
-                {!displayData.llm_analysis && !collecting && (
+                {!displayData.llm_analysis && !generatingBriefing && (
                     <p className="mt-3 text-xs text-slate-500">
-                        오늘의 LLM 팀 브리핑이 아직 없습니다. 매크로 데이터 + 뉴스를 기반으로 전문가 팀 분석을 생성합니다.
+                        AM 예측 브리핑이 아직 없습니다. 매일 07:00 자동 생성되거나 위 버튼으로 수동 생성하세요.
                     </p>
                 )}
-                {collecting && !displayData.llm_analysis && (
+                {generatingBriefing && (
                     <div className="mt-3 flex items-center gap-2 text-xs text-purple-400">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         매크로 수집 + 뉴스 분석 + LLM 브리핑 생성 중... (약 1~2분)
@@ -1053,12 +755,44 @@ export function MacroDashboard() {
                         <LlmBriefingContent content={displayData.llm_analysis} />
                     </div>
                 )}
-                {!llmOpen && displayData.llm_analysis && (
+                {!llmOpen && displayData.llm_analysis && !generatingBriefing && (
                     <p className="mt-2 text-xs text-slate-500 truncate">
                         {displayData.llm_analysis.split('\n').find(l => l.trim() && !l.startsWith('#'))?.trim().slice(0, 120) || '브리핑이 준비되었습니다.'}...
                     </p>
                 )}
             </div>
+
+            {/* PM 결산 브리핑 */}
+            {displayData.llm_analysis_pm && (
+                <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-5">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            PM 결산 브리핑
+                            <span className="text-[10px] font-normal text-amber-400/60">
+                                {displayData.collected_at_pm ? new Date(displayData.collected_at_pm).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '18:00'}
+                            </span>
+                        </h3>
+                        <button
+                            onClick={() => setLlmPmOpen(!llmPmOpen)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-amber-300 hover:bg-amber-900/30 rounded-lg transition-colors"
+                        >
+                            {llmPmOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            {llmPmOpen ? '접기' : '펼치기'}
+                        </button>
+                    </div>
+                    {llmPmOpen && (
+                        <div className="mt-4 pt-4 border-t border-amber-900/30">
+                            <LlmBriefingContent content={displayData.llm_analysis_pm} />
+                        </div>
+                    )}
+                    {!llmPmOpen && (
+                        <p className="mt-2 text-xs text-slate-500 truncate">
+                            {displayData.llm_analysis_pm.split('\n').find(l => l.trim() && !l.startsWith('#'))?.trim().slice(0, 120) || '결산 브리핑이 준비되었습니다.'}...
+                        </p>
+                    )}
+                </div>
+            )}
             </>
                 );
             })()}

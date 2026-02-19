@@ -27,12 +27,14 @@ const LEVEL_STYLES: Record<number, { dot: string; text: string; bg: string; labe
     3: { dot: 'bg-red-500', text: 'text-red-400', bg: 'bg-red-500/10', label: 'DANGER' },
 };
 
-function ScoreChip({ label, score, detail }: { label: string; score: number; detail?: string }) {
+function ScoreChip({ label, score, value }: { label: string; score: number; value?: string }) {
     const color = score > 0 ? 'text-emerald-400 bg-emerald-500/10' : score < 0 ? 'text-red-400 bg-red-500/10' : 'text-slate-500 bg-slate-800';
     const sign = score > 0 ? '+' : '';
     return (
-        <span className={`${color} px-2 py-0.5 rounded text-xs font-medium inline-flex items-center gap-1`} title={detail}>
-            {label} {sign}{score}
+        <span className={`${color} px-2 py-0.5 rounded text-xs font-medium inline-flex items-center gap-1`}>
+            {label}
+            {value && <span className="text-slate-400 font-mono">{value}</span>}
+            <span className={score > 0 ? 'text-emerald-400' : score < 0 ? 'text-red-400' : 'text-slate-600'}>({sign}{score})</span>
         </span>
     );
 }
@@ -88,9 +90,9 @@ export function MacroSummaryBar() {
             {/* Tier A: Global */}
             <div className="flex items-center gap-1.5">
                 <span className="text-slate-600 text-xs mr-0.5">글로벌</span>
-                <ScoreChip label="DXY" score={d.tier_a.dxy.score} detail={d.tier_a.dxy.value ? `${d.tier_a.dxy.value.toFixed(2)}` : undefined} />
-                <ScoreChip label="10Y" score={d.tier_a.us10y.score} detail={d.tier_a.us10y.value ? `${d.tier_a.us10y.value.toFixed(2)}%` : undefined} />
-                <ScoreChip label="VIX" score={d.tier_a.vix.score} detail={d.tier_a.vix.value ? `${d.tier_a.vix.value.toFixed(1)}` : undefined} />
+                <ScoreChip label="DXY" score={d.tier_a.dxy.score} value={d.tier_a.dxy.value?.toFixed(1)} />
+                <ScoreChip label="10Y" score={d.tier_a.us10y.score} value={d.tier_a.us10y.value ? `${d.tier_a.us10y.value.toFixed(2)}%` : undefined} />
+                <ScoreChip label="VIX" score={d.tier_a.vix.score} value={d.tier_a.vix.value?.toFixed(1)} />
             </div>
 
             <span className="text-slate-700">|</span>
@@ -98,9 +100,9 @@ export function MacroSummaryBar() {
             {/* Tier B: Domestic */}
             <div className="flex items-center gap-1.5">
                 <span className="text-slate-600 text-xs mr-0.5">수급</span>
-                <ScoreChip label="현물" score={d.tier_b.foreign_cash.score} />
-                <ScoreChip label="선물" score={d.tier_b.futures.score} />
-                <ScoreChip label="공매도" score={d.tier_b.short_selling.score} />
+                <ScoreChip label="현물" score={d.tier_b.foreign_cash.score} value={d.tier_b.foreign_cash.net_amount ? `${d.tier_b.foreign_cash.net_amount.toLocaleString()}억` : undefined} />
+                <ScoreChip label="선물" score={d.tier_b.futures.score} value={d.tier_b.futures.net ? `${d.tier_b.futures.net.toLocaleString()}계약` : undefined} />
+                <ScoreChip label="공매도" score={d.tier_b.short_selling.score} value={d.tier_b.short_selling.change_pct ? `${d.tier_b.short_selling.change_pct > 0 ? '+' : ''}${d.tier_b.short_selling.change_pct.toFixed(1)}%` : undefined} />
             </div>
 
             {/* Link */}

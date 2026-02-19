@@ -4,11 +4,10 @@ import React, { useState } from 'react';
 import { usePortfolioStore } from '@/lib/stores/portfolio-store';
 import { WatchlistItem, WATCHLIST_GROUPS } from '@/lib/hooks/use-watchlist';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { PositionModal } from '@/components/features/portfolio/trade-modal';
 import {
     ChevronLeft, ChevronRight, Wallet, Star, Plus,
-    Pencil, Trash2, ArrowRightLeft
+    Pencil, Trash2, ArrowRightLeft, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,8 +42,12 @@ export function UnifiedSidebar({
 
     const positions = usePortfolioStore((s) => s.positions);
     const removePosition = usePortfolioStore((s) => s.removePosition);
+    const syncFromKiwoom = usePortfolioStore((s) => s.syncFromKiwoom);
+    const lastSyncedAt = usePortfolioStore((s) => s.lastSyncedAt);
     const totalValue = usePortfolioStore((s) => s.getTotalValue());
     const totalProfit = usePortfolioStore((s) => s.getTotalProfit());
+    const [syncing, setSyncing] = useState(false);
+
     const totalProfitRate = totalValue > 0 ? (totalProfit / (totalValue - totalProfit)) * 100 : 0;
 
     const [positionModal, setPositionModal] = useState<{
@@ -152,6 +155,13 @@ export function UnifiedSidebar({
                             }
                         }}
                         nameMap={Object.fromEntries(watchlist.map(w => [w.symbol, w.name]))}
+                        syncing={syncing}
+                        lastSyncedAt={lastSyncedAt}
+                        onSync={async () => {
+                            setSyncing(true);
+                            await syncFromKiwoom();
+                            setSyncing(false);
+                        }}
                     />
                 ) : (
                     <WatchlistTab
@@ -167,6 +177,9 @@ export function UnifiedSidebar({
                         onRemove={onRemoveFromWatchlist}
                         onOpenSearch={onOpenSearch}
                         onMoveToGroup={onMoveToGroup}
+                        onAddToPortfolio={(symbol, name) => {
+                            setPositionModal({ isOpen: true, mode: 'add', symbol, symbolName: name });
+                        }}
                     />
                 )}
             </div>
@@ -184,7 +197,7 @@ export function UnifiedSidebar({
 
 // Portfolio Tab
 function PortfolioTab({
-    positions, totalValue, totalProfit, totalProfitRate, currentSymbol, onSelectSymbol, onAdd, onEdit, onDelete, nameMap,
+    positions, totalValue, totalProfit, totalProfitRate, currentSymbol, onSelectSymbol, onAdd, onEdit, onDelete, nameMap, syncing, lastSyncedAt, onSync,
 }: {
     positions: { symbol: string; symbolName: string; avgPrice: number; quantity: number; currentPrice: number; profitRate: number; profitAmount: number }[];
     totalValue: number; totalProfit: number; totalProfitRate: number;
@@ -194,8 +207,15 @@ function PortfolioTab({
     onEdit: (symbol: string, symbolName: string) => void;
     onDelete: (symbol: string) => void;
     nameMap: Record<string, string>;
+    syncing: boolean;
+    lastSyncedAt: string | null;
+    onSync: () => void;
 }) {
     const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+    const [refreshingPrice, setRefreshingPrice] = useState(false);
+    const updateCurrentPrice = usePortfolioStore((s) => s.updateCurrentPrice);
+    const fullPositions = usePortfolioStore((s) => s.positions);
+    const hasNonKiwoom = fullPositions.some(p => p.broker !== 'kiwoom');
 
     // Resolve names for positions not in watchlist
     React.useEffect(() => {
@@ -213,6 +233,34 @@ function PortfolioTab({
             } catch { /* ignore */ }
         });
     }, [positions, nameMap]);
+
+    // 비키움 포지션 현재가 조회 함수
+    const fetchNonKiwoomPrices = React.useCallback(async () => {
+        const syms = fullPositions.filter(p => p.broker !== 'kiwoom').map(p => p.symbol);
+        if (syms.length === 0) return;
+        setRefreshingPrice(true);
+        try {
+            const res = await fetch('/api/screener/v2/realtime', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbols: syms }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                (data.results || []).forEach((r: { symbol: string; cur_price: number }) => {
+                    updateCurrentPrice(r.symbol, r.cur_price);
+                });
+            }
+        } catch { /* ignore */ }
+        setRefreshingPrice(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fullPositions.filter(p => p.broker !== 'kiwoom').map(p => p.symbol).join(',')]);
+
+    // 마운트 시 자동 조회
+    React.useEffect(() => {
+        if (hasNonKiwoom) fetchNonKiwoomPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const getName = (pos: { symbol: string; symbolName: string }) => {
         return nameMap[pos.symbol] || resolvedNames[pos.symbol] || (pos.symbolName !== pos.symbol ? pos.symbolName : pos.symbol);
@@ -234,12 +282,37 @@ function PortfolioTab({
                         </span>
                     </div>
                 </div>
-                <button
-                    onClick={onAdd}
-                    className="w-full mt-2 flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors border border-blue-800/50"
-                >
-                    <Plus className="w-3.5 h-3.5" /> 종목 등록
-                </button>
+                <div className="flex gap-1.5 mt-2">
+                    <button
+                        onClick={onSync}
+                        disabled={syncing}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 rounded-lg transition-colors border border-emerald-800/50"
+                    >
+                        <RefreshCw className={cn("w-3.5 h-3.5", syncing && "animate-spin")} />
+                        {syncing ? '동기화...' : '키움 싱크'}
+                    </button>
+                    <button
+                        onClick={onAdd}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors border border-blue-800/50"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> 등록
+                    </button>
+                </div>
+                {hasNonKiwoom && (
+                    <button
+                        onClick={fetchNonKiwoomPrices}
+                        disabled={refreshingPrice}
+                        className="w-full flex items-center justify-center gap-1 mt-1.5 px-2 py-1.5 text-xs text-amber-400 hover:text-amber-300 hover:bg-slate-800 rounded-lg transition-colors border border-amber-800/40"
+                    >
+                        <RefreshCw className={cn("w-3 h-3", refreshingPrice && "animate-spin")} />
+                        {refreshingPrice ? '현재가 조회중...' : '토스/수동 현재가 갱신'}
+                    </button>
+                )}
+                {lastSyncedAt && (
+                    <p className="text-[10px] text-slate-600 mt-1 text-center">
+                        키움 동기화: {new Date(lastSyncedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                )}
             </div>
 
             {/* List */}
@@ -261,7 +334,7 @@ function PortfolioTab({
                             <div
                                 key={pos.symbol}
                                 className={cn(
-                                    'rounded-lg p-2.5 cursor-pointer transition-all border',
+                                    'relative group rounded-lg p-2.5 cursor-pointer transition-all border',
                                     currentSymbol === pos.symbol
                                         ? 'border-purple-600 bg-slate-800/80'
                                         : 'border-transparent hover:bg-slate-800/40'
@@ -270,7 +343,16 @@ function PortfolioTab({
                             >
                                 <div className="flex justify-between items-start mb-1">
                                     <div>
-                                        <h3 className="text-white font-semibold text-sm">{getName(pos)}</h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <h3 className="text-white font-semibold text-sm">{getName(pos)}</h3>
+                                            {/* 브로커 배지 */}
+                                            {(pos as any).broker === 'toss' && (
+                                                <span className="text-[9px] px-1 py-0.5 rounded border border-blue-500/50 text-blue-400 bg-blue-500/10 leading-none">토스</span>
+                                            )}
+                                            {(pos as any).broker === 'kiwoom' && (
+                                                <span className="text-[9px] px-1 py-0.5 rounded border border-red-500/40 text-red-400/70 bg-red-500/5 leading-none">키움</span>
+                                            )}
+                                        </div>
                                         <p className="text-[10px] text-slate-500">{pos.symbol}</p>
                                     </div>
                                     <div className="text-right">
@@ -280,25 +362,23 @@ function PortfolioTab({
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex justify-between text-[10px] text-slate-500 mb-2">
+                                <div className="flex justify-between text-[10px] text-slate-500">
                                     <span>평단 {pos.avgPrice.toLocaleString()}</span>
                                     <span>{pos.quantity}주</span>
                                 </div>
-                                <div className="flex gap-1.5">
-                                    <Button
-                                        size="sm"
+                                <div className="absolute right-1.5 top-1.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
                                         onClick={(e) => { e.stopPropagation(); onEdit(pos.symbol, getName(pos)); }}
-                                        className="flex-1 h-6 text-[10px] bg-amber-900/30 hover:bg-amber-900/50 text-amber-400 border border-amber-800"
+                                        className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-slate-700 transition-colors"
                                     >
-                                        <Pencil className="w-3 h-3 mr-0.5" /> 수정
-                                    </Button>
-                                    <Button
-                                        size="sm"
+                                        <Pencil className="w-3 h-3" />
+                                    </button>
+                                    <button
                                         onClick={(e) => { e.stopPropagation(); onDelete(pos.symbol); }}
-                                        className="flex-1 h-6 text-[10px] bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800"
+                                        className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-700 transition-colors"
                                     >
-                                        <Trash2 className="w-3 h-3 mr-0.5" /> 삭제
-                                    </Button>
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -311,7 +391,7 @@ function PortfolioTab({
 
 // Watchlist Tab
 function WatchlistTab({
-    watchlist, allWatchlist, activeGroup, activeSymbol, onChangeGroup, onSelectStock, onRemove, onOpenSearch, onMoveToGroup,
+    watchlist, allWatchlist, activeGroup, activeSymbol, onChangeGroup, onSelectStock, onRemove, onOpenSearch, onMoveToGroup, onAddToPortfolio,
 }: {
     watchlist: WatchlistItem[];
     allWatchlist: WatchlistItem[];
@@ -322,6 +402,7 @@ function WatchlistTab({
     onRemove: (symbol: string) => void;
     onOpenSearch: () => void;
     onMoveToGroup?: (symbol: string, groupId: number) => void;
+    onAddToPortfolio: (symbol: string, name: string) => void;
 }) {
     return (
         <>
@@ -368,6 +449,7 @@ function WatchlistTab({
                             onSelect={() => onSelectStock(stock.symbol)}
                             onRemove={() => onRemove(stock.symbol)}
                             onMoveToGroup={onMoveToGroup}
+                            onAddToPortfolio={() => onAddToPortfolio(stock.symbol, stock.name)}
                         />
                     ))
                 )}
@@ -388,22 +470,36 @@ function WatchlistTab({
 
 // Watchlist Row
 function WatchlistRow({
-    stock, isActive, currentGroup, onSelect, onRemove, onMoveToGroup,
+    stock, isActive, currentGroup, onSelect, onRemove, onMoveToGroup, onAddToPortfolio,
 }: {
     stock: WatchlistItem; isActive: boolean; currentGroup: number;
     onSelect: () => void; onRemove: () => void; onMoveToGroup?: (s: string, g: number) => void;
+    onAddToPortfolio: () => void;
 }) {
     const [showMenu, setShowMenu] = useState(false);
     const others = WATCHLIST_GROUPS.filter(g => g.id !== currentGroup);
     const colors: Record<string, string> = { blue: '#3b82f6', green: '#22c55e', purple: '#a855f7' };
+    const isInPortfolio = usePortfolioStore((s) => s.positions.some(p => p.symbol === stock.symbol));
 
     return (
         <div className={cn('relative group', isActive ? 'bg-slate-800 border-l-2 border-l-blue-500' : 'hover:bg-slate-800/50')}>
             <button onClick={onSelect} className="w-full text-left px-3 py-2.5 border-b border-slate-800/50 transition-colors">
-                <span className={cn('text-sm font-medium', isActive ? 'text-white' : 'text-slate-300')}>{stock.name}</span>
+                <div className="flex items-center gap-1.5">
+                    <span className={cn('text-sm font-medium', isActive ? 'text-white' : 'text-slate-300')}>{stock.name}</span>
+                    {isInPortfolio && (
+                        <span className="text-[9px] px-1 py-0.5 bg-emerald-500/20 text-emerald-400 rounded font-medium">보유</span>
+                    )}
+                </div>
                 <span className="block text-[10px] text-slate-600">{stock.symbol}</span>
             </button>
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onAddToPortfolio(); }}
+                    className="p-1 rounded text-slate-500 hover:text-emerald-400 hover:bg-slate-700 transition-colors"
+                    title="보유종목으로 전환"
+                >
+                    <Wallet className="w-3.5 h-3.5" />
+                </button>
                 {onMoveToGroup && (
                     <button
                         onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}

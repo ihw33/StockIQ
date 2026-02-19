@@ -1,0 +1,236 @@
+{
+  "sector_name": "증권",
+  "sector_no": "321",
+  "total_stocks": 38,
+  "stocks": [
+    {
+      "code": "001515",
+      "name": "SK증권우",
+      "price": 3470,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001510",
+      "name": "SK증권",
+      "price": 1215,
+      "change_pct": 0.0
+    },
+    {
+      "code": "078020",
+      "name": "LS증권",
+      "price": 7610,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001290",
+      "name": "상상인증권",
+      "price": 904,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001720",
+      "name": "신영증권",
+      "price": 227500,
+      "change_pct": 0.0
+    },
+    {
+      "code": "006800",
+      "name": "미래에셋증권",
+      "price": 61600,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003540",
+      "name": "대신증권",
+      "price": 41400,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003530",
+      "name": "한화투자증권",
+      "price": 7360,
+      "change_pct": 0.0
+    },
+    {
+      "code": "00680K",
+      "name": "미래에셋증권2우B",
+      "price": 19760,
+      "change_pct": 0.0
+    },
+    {
+      "code": "016610",
+      "name": "DB증권",
+      "price": 15360,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003460",
+      "name": "유화증권",
+      "price": 3495,
+      "change_pct": 0.0
+    },
+    {
+      "code": "030610",
+      "name": "교보증권",
+      "price": 14000,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001500",
+      "name": "현대차증권",
+      "price": 10680,
+      "change_pct": 0.0
+    },
+    {
+      "code": "006805",
+      "name": "미래에셋증권우",
+      "price": 21400,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003545",
+      "name": "대신증권우",
+      "price": 27150,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001200",
+      "name": "유진투자증권",
+      "price": 4780,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003547",
+      "name": "대신증권2우B",
+      "price": 26050,
+      "change_pct": 0.0
+    },
+    {
+      "code": "190650",
+      "name": "코리아에셋투자증권",
+      "price": 8720,
+      "change_pct": 0.0
+    },
+    {
+      "code": "030210",
+      "name": "다올투자증권",
+      "price": 4440,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003470",
+      "name": "유안타증권",
+      "price": 5040,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001750",
+      "name": "한양증권",
+      "price": 25650,
+      "change_pct": 0.0
+    },
+    {
+      "code": "005940",
+      "name": "NH투자증권",
+      "price": 30900,
+      "change_pct": 0.0
+    },
+    {
+      "code": "023590",
+      "name": "다우기술",
+      "price": 55800,
+      "change_pct": 0.0
+    },
+    {
+      "code": "005945",
+      "name": "NH투자증권우",
+      "price": 26400,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003475",
+      "name": "유안타증권우",
+      "price": 4730,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003465",
+      "name": "유화증권우",
+      "price": 2910,
+      "change_pct": 0.0
+    },
+    {
+      "code": "003535",
+      "name": "한화투자증권우",
+      "price": 9570,
+      "change_pct": 0.0
+    },
+    {
+      "code": "071050",
+      "name": "한국금융지주",
+      "price": 257500,
+      "change_pct": 0.0
+    },
+    {
+      "code": "016360",
+      "name": "삼성증권",
+      "price": 101000,
+      "change_pct": 0.0
+    },
+    {
+      "code": "039490",
+      "name": "키움증권",
+      "price": 469500,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001275",
+      "name": "부국증권우",
+      "price": 31350,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001755",
+      "name": "한양증권우",
+      "price": 21900,
+      "change_pct": 0.0
+    },
+    {
+      "code": "071055",
+      "name": "한국금융지주우",
+      "price": 171000,
+      "change_pct": 0.0
+    },
+    {
+      "code": "138040",
+      "name": "메리츠금융지주",
+      "price": 136300,
+      "change_pct": 0.0
+    },
+    {
+      "code": "001270",
+      "name": "부국증권",
+      "price": 77700,
+      "change_pct": 0.0
+    },
+    {
+      "code": "000680",
+      "name": "LS네트웍스",
+      "price": 3510,
+      "change_pct": 0.0
+    },
+    {
+      "code": "032190",
+      "name": "다우데이타",
+      "price": 26850,
+      "change_pct": 0.0
+    },
+    {
+      "code": "064820",
+      "name": "케이프",
+      "price": 10950,
+      "change_pct": 0.0
+    }
+  ],
+  "crawled_at": "2026-02-13T16:32:13.438186"
+}

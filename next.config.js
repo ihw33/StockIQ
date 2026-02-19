@@ -4,11 +4,18 @@ const nextConfig = {
   images: {
     domains: [
       'localhost',
-      // Add your image domains here
     ],
   },
-  experimental: {
-    // serverActions: true, // Already enabled by default in Next.js 14
+  async rewrites() {
+    // FastAPI backend URL (Docker: stockiq-api:8001, local: localhost:8001)
+    const backend = process.env.BACKEND_URL || 'http://localhost:8001'
+    return {
+      // fallback: only triggered when no Next.js route matches
+      fallback: [
+        { source: '/api/:path*', destination: `${backend}/api/:path*` },
+        { source: '/health', destination: `${backend}/health` },
+      ],
+    }
   },
 }
 

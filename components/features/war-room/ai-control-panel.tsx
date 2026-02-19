@@ -1,13 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, Brain, Building2, Loader2, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import type { RecentAlert } from './right-panel';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Plain div used instead of Radix ScrollArea to avoid display:table width issues
+
+interface InvestorHistoryItem {
+    date: string;
+    close: number;
+    change: number;
+    volume: number;
+    foreign: number;
+    institution: number;
+    individual: number;
+}
+
+interface InvestorCumulative {
+    foreign: number;
+    institution: number;
+    individual: number;
+}
 
 // ─── Company data types & evaluation (from company-info-card) ───
+
+interface DartOverview {
+    corp_name: string;
+    stock_name: string;
+    ceo_nm: string;
+    induty_code: string;
+    induty_name: string;
+    est_dt: string;
+    hm_url: string;
+    acc_mt: string;
+    adres: string;
+}
 
 interface CompanyData {
     symbol: string;
@@ -31,6 +59,7 @@ interface CompanyData {
     operating_profit: number | null;
     net_income: number | null;
     dividend_rate: number | null;
+    dart_overview?: DartOverview;
 }
 
 type Signal = 'very_good' | 'good' | 'neutral' | 'bad' | 'very_bad';
@@ -215,7 +244,7 @@ interface AIControlPanelProps {
     currentSymbol: string;
     currentName: string;
     recentAlerts?: RecentAlert[];
-    onGoToReports?: (sessionId?: string, mode?: 'algo' | 'llm' | 'company') => void;
+    onGoToReports?: (mode?: 'algo' | 'llm' | 'company') => void;
 }
 
 export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], onGoToReports }: AIControlPanelProps) {
@@ -224,6 +253,8 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
     const [loadingCompany, setLoadingCompany] = useState(false);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [companyLoading, setCompanyLoading] = useState(false);
+    const [investorHistory, setInvestorHistory] = useState<InvestorHistoryItem[]>([]);
+    const [investorCumulative, setInvestorCumulative] = useState<InvestorCumulative | null>(null);
 
     // Fetch company info when symbol changes
     useEffect(() => {
@@ -245,6 +276,28 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
         return () => { ignore = true; };
     }, [currentSymbol]);
 
+    // Fetch investor history when symbol changes
+    useEffect(() => {
+        if (!currentSymbol) return;
+        setInvestorHistory([]);
+        setInvestorCumulative(null);
+        let ignore = false;
+        const load = async () => {
+            try {
+                const res = await fetch(`/api/stock/investor-history?symbol=${currentSymbol}&days=60`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (!ignore) {
+                        setInvestorHistory(json.data || []);
+                        setInvestorCumulative(json.cumulative || null);
+                    }
+                }
+            } catch { /* silent */ }
+        };
+        load();
+        return () => { ignore = true; };
+    }, [currentSymbol]);
+
     const triggerAnalysis = async (type: 'algo' | 'deep' | 'company') => {
         if (!currentSymbol) return;
 
@@ -255,7 +308,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
         };
         const labels: Record<string, string> = {
             algo: '알고리즘 분석',
-            deep: '심층 분석',
+            deep: '종합 분석',
             company: '기업 분석',
         };
         const setLoading = type === 'algo' ? setLoadingAlgo : type === 'deep' ? setLoadingDeep : setLoadingCompany;
@@ -322,7 +375,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                         )}
                     >
                         {loadingDeep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
-                        심층
+                        종합
                     </button>
                     <button
                         onClick={() => triggerAnalysis('company')}
@@ -363,9 +416,9 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                     </div>
                     {recentAlerts.slice(0, 5).map((alert) => (
                         <div
-                            key={alert.id}
+                            key={`${alert.id}-${alert.analyzedAt}`}
                             className="flex items-center gap-2 text-[11px] py-0.5 cursor-pointer hover:bg-slate-800/50 rounded px-1 -mx-1"
-                            onClick={() => onGoToReports?.(`db_${alert.id}`, alert.mode)}
+                            onClick={() => onGoToReports?.(alert.mode)}
                         >
                             <CheckCircle2 className={cn('w-3 h-3 shrink-0',
                                 alert.mode === 'algo' ? 'text-blue-400' :
@@ -376,7 +429,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                 alert.mode === 'algo' ? 'bg-blue-500/10 text-blue-400' :
                                 alert.mode === 'company' ? 'bg-amber-500/10 text-amber-400' : 'bg-purple-500/10 text-purple-400'
                             )}>
-                                {alert.mode === 'algo' ? '알고리즘' : alert.mode === 'company' ? '기업' : '심층'}
+                                {alert.mode === 'algo' ? '알고리즘' : alert.mode === 'company' ? '기업' : '종합'}
                             </span>
                             <span className="text-slate-600 text-[10px] ml-auto shrink-0">
                                 {formatTimeAgo(alert.analyzedAt)}
@@ -387,7 +440,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
             )}
 
             {/* Company Info (dark theme) */}
-            <ScrollArea className="flex-1">
+            <div className="flex-1 overflow-y-auto">
                 <div className="p-3">
                     {companyLoading && !companyData ? (
                         <div className="animate-pulse space-y-3">
@@ -483,6 +536,27 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                         {companyData.settle_month && <div>결산 {companyData.settle_month}월</div>}
                                     </div>
                                 </div>
+
+                                {/* DART 기업개황 */}
+                                {companyData.dart_overview && (
+                                    <div className="bg-slate-800/50 rounded-lg p-2.5">
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                            <span className="font-bold text-[11px] text-slate-300">기업 추가정보</span>
+                                            <span className="text-[9px] text-slate-500">DART</span>
+                                        </div>
+                                        <div className="space-y-1 text-[11px] text-slate-400">
+                                            <div className="flex justify-between"><span>업종</span><span className="text-slate-300">{companyData.dart_overview.induty_name}</span></div>
+                                            <div className="flex justify-between"><span>종목명</span><span className="text-slate-300">{companyData.dart_overview.stock_name}</span></div>
+                                            <div className="flex justify-between"><span>대표자</span><span className="text-slate-300">{companyData.dart_overview.ceo_nm}</span></div>
+                                            {companyData.dart_overview.est_dt && (
+                                                <div className="flex justify-between"><span>설립일</span><span className="text-slate-300">{companyData.dart_overview.est_dt.replace(/(\d{4})(\d{2})(\d{2})/, '$1.$2.$3')}</span></div>
+                                            )}
+                                            {companyData.dart_overview.hm_url && (
+                                                <div className="flex justify-between"><span>홈페이지</span><a href={companyData.dart_overview.hm_url.startsWith('http') ? companyData.dart_overview.hm_url : `https://${companyData.dart_overview.hm_url}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline truncate max-w-[120px]">{companyData.dart_overview.hm_url.replace(/^https?:\/\//, '')}</a></div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Summary Opinion */}
@@ -492,6 +566,71 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                                     {generateSummary(companyData)}
                                 </p>
                             </div>
+
+                            {/* Investor Daily Table (0796 style) */}
+                            {investorHistory.length > 0 && (() => {
+                                const fmtAmt = (v: number) => {
+                                    const s = v > 0 ? '+' : v < 0 ? '-' : '';
+                                    const abs = Math.abs(v);
+                                    return `${s}${abs.toLocaleString()}`;
+                                };
+                                const clr = (v: number) => v > 0 ? 'text-red-400' : v < 0 ? 'text-blue-400' : 'text-slate-600';
+                                return (
+                                <div className="bg-slate-800/50 rounded-lg p-2 mt-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-xs text-slate-300">투자자별 매매동향 <span className="text-slate-500 font-normal">(정규장)</span></span>
+                                        <span className="text-[10px] text-slate-500">단위: 백만원</span>
+                                    </div>
+
+                                    {/* Cumulative */}
+                                    {investorCumulative && (
+                                        <div className="flex items-center gap-1.5 mt-1.5 mb-2 text-[11px] bg-slate-900/50 rounded px-2 py-1">
+                                            <span className="text-slate-500">누적</span>
+                                            <span className={clr(investorCumulative.individual)}>
+                                                개인 {fmtAmt(investorCumulative.individual)}
+                                            </span>
+                                            <span className={clr(investorCumulative.foreign)}>
+                                                외인 {fmtAmt(investorCumulative.foreign)}
+                                            </span>
+                                            <span className={clr(investorCumulative.institution)}>
+                                                기관 {fmtAmt(investorCumulative.institution)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Scrollable list — grid layout */}
+                                    <div className="max-h-[280px] overflow-y-auto overflow-x-hidden text-[10px]">
+                                        {/* Header */}
+                                        <div className="grid text-slate-500 border-b border-slate-700 pb-0.5 mb-0.5 sticky top-0 bg-slate-800/95 z-10" style={{gridTemplateColumns:'32px 48px 50px 48px 1fr 1fr 1fr'}}>
+                                            <span>일자</span>
+                                            <span className="text-right">종가</span>
+                                            <span className="text-right">대비</span>
+                                            <span className="text-right">거래량</span>
+                                            <span className="text-right">개인</span>
+                                            <span className="text-right">외국인</span>
+                                            <span className="text-right">기관</span>
+                                        </div>
+                                        {/* Rows */}
+                                        {investorHistory.map(row => {
+                                            const sign = (v: number) => v > 0 ? `+${v}` : `${v}`;
+                                            const dt = row.date ? `${row.date.slice(4, 6)}/${row.date.slice(6, 8)}` : '';
+                                            const vol = row.volume >= 1_000_000 ? `${(row.volume / 1_000_000).toFixed(1)}M` : row.volume >= 1000 ? `${Math.round(row.volume / 1000)}K` : `${row.volume}`;
+                                            return (
+                                                <div key={row.date} className="grid border-b border-slate-800/20 hover:bg-slate-700/30 py-0.5" style={{gridTemplateColumns:'32px 48px 50px 48px 1fr 1fr 1fr'}}>
+                                                    <span className="text-slate-400">{dt}</span>
+                                                    <span className="text-right text-slate-300 font-mono">{row.close?.toLocaleString() || '-'}</span>
+                                                    <span className={`text-right font-mono ${clr(row.change)}`}>{row.change ? sign(row.change) : '-'}</span>
+                                                    <span className="text-right text-slate-500 font-mono">{vol}</span>
+                                                    <span className={`text-right font-mono ${clr(row.individual)}`}>{fmtAmt(row.individual)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.foreign)}`}>{fmtAmt(row.foreign)}</span>
+                                                    <span className={`text-right font-mono ${clr(row.institution)}`}>{fmtAmt(row.institution)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                );
+                            })()}
                         </div>
                     ) : (
                         <div className="text-center text-slate-600 text-xs py-8">
@@ -499,7 +638,7 @@ export function AIControlPanel({ currentSymbol, currentName, recentAlerts = [], 
                         </div>
                     )}
                 </div>
-            </ScrollArea>
+            </div>
         </div>
     );
 }

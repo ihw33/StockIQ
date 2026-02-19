@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useReportStore, AnalysisReport } from '@/lib/store/report-store';
-import { CombinedReportView } from '@/components/features/reports/combined-report-view';
+import { AlgoReportView } from '@/components/features/reports/algo-report-view';
+import { LlmReportView } from '@/components/features/reports/llm-report-view';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -42,57 +43,24 @@ function ReportsContent() {
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [filterMode, setFilterMode] = useState<'all' | 'algo' | 'llm' | 'company'>('all');
 
-    // Group reports by sessionId (or standalone)
+    // Convert reports to individual items (no grouping)
     const reportGroups = useMemo(() => {
-        const groups: Map<string, ReportGroup> = new Map();
-
-        for (const report of reports) {
-            if (report.sessionId) {
-                const existing = groups.get(report.sessionId);
-                if (existing) {
-                    if (report.mode === 'algo') existing.algoReport = report;
-                    if (report.mode === 'llm') existing.llmReport = report;
-                    if (report.mode === 'company') existing.companyReport = report;
-                    existing.hasAlgo = existing.hasAlgo || report.mode === 'algo';
-                    existing.hasLlm = existing.hasLlm || report.mode === 'llm';
-                    existing.hasCompany = existing.hasCompany || report.mode === 'company';
-                    existing.hasPosition = existing.hasPosition || !!report.positionInfo;
-                } else {
-                    groups.set(report.sessionId, {
-                        id: report.sessionId,
-                        sessionId: report.sessionId,
-                        symbol: report.symbol,
-                        symbolName: report.symbolName,
-                        timestamp: new Date(report.timestamp),
-                        hasAlgo: report.mode === 'algo',
-                        hasLlm: report.mode === 'llm',
-                        hasCompany: report.mode === 'company',
-                        hasPosition: !!report.positionInfo,
-                        algoReport: report.mode === 'algo' ? report : undefined,
-                        llmReport: report.mode === 'llm' ? report : undefined,
-                        companyReport: report.mode === 'company' ? report : undefined,
-                    });
-                }
-            } else {
-                groups.set(report.id, {
-                    id: report.id,
-                    symbol: report.symbol,
-                    symbolName: report.symbolName,
-                    timestamp: new Date(report.timestamp),
-                    hasAlgo: report.mode === 'algo',
-                    hasLlm: report.mode === 'llm',
-                    hasCompany: report.mode === 'company',
-                    hasPosition: !!report.positionInfo,
-                    algoReport: report.mode === 'algo' ? report : undefined,
-                    llmReport: report.mode === 'llm' ? report : undefined,
-                    companyReport: report.mode === 'company' ? report : undefined,
-                });
-            }
-        }
-
-        return Array.from(groups.values()).sort(
-            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
+        return reports
+            .map((report): ReportGroup => ({
+                id: report.id,
+                sessionId: report.sessionId,
+                symbol: report.symbol,
+                symbolName: report.symbolName,
+                timestamp: new Date(report.timestamp),
+                hasAlgo: report.mode === 'algo',
+                hasLlm: report.mode === 'llm',
+                hasCompany: report.mode === 'company',
+                hasPosition: !!report.positionInfo,
+                algoReport: report.mode === 'algo' ? report : undefined,
+                llmReport: report.mode === 'llm' ? report : undefined,
+                companyReport: report.mode === 'company' ? report : undefined,
+            }))
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }, [reports]);
 
     // Filter groups
@@ -104,21 +72,14 @@ function ReportsContent() {
         return reportGroups;
     }, [reportGroups, filterMode]);
 
-    // Group by symbol for sidebar
-    const groupedBySymbol = useMemo(() => {
-        const map: Record<string, ReportGroup[]> = {};
-        for (const group of filteredGroups) {
-            if (!map[group.symbol]) map[group.symbol] = [];
-            map[group.symbol].push(group);
-        }
-        return map;
-    }, [filteredGroups]);
+    // No grouping by symbol - display all reports individually
+    const displayGroups = filteredGroups;
 
-    // Auto-select from URL query
+    // Auto-select from URL query (by report ID)
     useEffect(() => {
-        const sessionParam = searchParams.get('session');
-        if (sessionParam && reportGroups.length > 0) {
-            const found = reportGroups.find(g => g.sessionId === sessionParam);
+        const reportIdParam = searchParams.get('id');
+        if (reportIdParam && reportGroups.length > 0) {
+            const found = reportGroups.find(g => g.id === reportIdParam);
             if (found) {
                 setSelectedGroupId(found.id);
             }
@@ -136,12 +97,9 @@ function ReportsContent() {
 
     const handleDelete = (group: ReportGroup) => {
         if (!confirm('이 보고서를 삭제하시겠습니까?')) return;
-        if (group.sessionId) {
-            deleteSession(group.sessionId);
-        } else {
-            if (group.algoReport) deleteReport(group.algoReport.id);
-            if (group.llmReport) deleteReport(group.llmReport.id);
-        }
+        if (group.algoReport) deleteReport(group.algoReport.id);
+        if (group.llmReport) deleteReport(group.llmReport.id);
+        if (group.companyReport) deleteReport(group.companyReport.id);
         if (selectedGroupId === group.id) {
             setSelectedGroupId(null);
         }
@@ -171,7 +129,7 @@ function ReportsContent() {
                                         : 'text-slate-400 hover:text-slate-300'
                                 }`}
                             >
-                                {mode === 'all' ? '전체' : mode === 'algo' ? '알고리즘' : mode === 'llm' ? '심층' : '기업'}
+                                {mode === 'all' ? '전체' : mode === 'algo' ? '알고리즘' : mode === 'llm' ? '종합' : '기업'}
                             </button>
                         ))}
                     </div>
@@ -179,74 +137,60 @@ function ReportsContent() {
 
                 {/* Report List */}
                 <ScrollArea className="flex-1">
-                    {Object.keys(groupedBySymbol).length === 0 ? (
+                    {displayGroups.length === 0 ? (
                         <div className="p-6 text-center">
                             <p className="text-sm text-slate-500">보고서가 없습니다</p>
-                            <p className="text-xs text-slate-600 mt-1">War Room에서 심층 분석을 실행하세요</p>
+                            <p className="text-xs text-slate-600 mt-1">War Room에서 종합 분석을 실행하세요</p>
                         </div>
                     ) : (
                         <div className="py-2">
-                            {Object.entries(groupedBySymbol).map(([symbol, groups]) => (
-                                <div key={symbol} className="mb-1">
-                                    {/* Symbol Header */}
-                                    <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                        {groups[0].symbolName} ({symbol})
+                            {displayGroups.map((group) => (
+                                <div
+                                    key={group.id}
+                                    onClick={() => setSelectedGroupId(group.id)}
+                                    className={`group px-4 py-3 cursor-pointer transition-colors border-l-2 ${
+                                        selectedGroupId === group.id
+                                            ? 'bg-slate-800 border-l-indigo-500'
+                                            : 'border-l-transparent hover:bg-slate-900'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        {group.hasAlgo && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/50 text-blue-300">
+                                                알고
+                                            </span>
+                                        )}
+                                        {group.hasLlm && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-900/50 text-purple-300">
+                                                종합
+                                            </span>
+                                        )}
+                                        {group.hasCompany && (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/50 text-amber-300">
+                                                기업
+                                            </span>
+                                        )}
+                                        <span className="text-xs text-slate-400 flex-1">
+                                            {group.symbolName}
+                                        </span>
+                                        <span className="text-[11px] text-slate-500">
+                                            {format(new Date(group.timestamp), 'M/d HH:mm')}
+                                        </span>
                                     </div>
-
-                                    {/* Report Items */}
-                                    {groups.map((group) => (
-                                        <div
-                                            key={group.id}
-                                            onClick={() => setSelectedGroupId(group.id)}
-                                            className={`group px-4 py-3 cursor-pointer transition-colors border-l-2 ${
-                                                selectedGroupId === group.id
-                                                    ? 'bg-slate-800 border-l-indigo-500'
-                                                    : 'border-l-transparent hover:bg-slate-900'
-                                            }`}
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs text-slate-400 line-clamp-1 flex-1">
+                                            {(group.companyReport?.analysis || group.llmReport?.analysis || group.algoReport?.analysis || '').substring(0, 60)}...
+                                        </p>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(group);
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 ml-2 p-1 hover:bg-slate-700 rounded transition-opacity"
                                         >
-                                            <div className="flex items-center gap-1.5 mb-1">
-                                                {group.hasAlgo && group.hasLlm ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-900/50 text-indigo-300">
-                                                        종합
-                                                    </span>
-                                                ) : group.hasCompany ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/50 text-amber-300">
-                                                        기업
-                                                    </span>
-                                                ) : group.hasLlm ? (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-900/50 text-purple-300">
-                                                        심층
-                                                    </span>
-                                                ) : (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/50 text-blue-300">
-                                                        알고
-                                                    </span>
-                                                )}
-                                                {group.hasPosition && (
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/50 text-emerald-300">
-                                                        보유
-                                                    </span>
-                                                )}
-                                                <span className="text-[11px] text-slate-500 ml-auto">
-                                                    {format(new Date(group.timestamp), 'M/d HH:mm')}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-xs text-slate-400 line-clamp-1 flex-1">
-                                                    {(group.companyReport?.analysis || group.llmReport?.analysis || group.algoReport?.analysis || '').substring(0, 60)}...
-                                                </p>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDelete(group);
-                                                    }}
-                                                    className="opacity-0 group-hover:opacity-100 ml-2 p-1 hover:bg-slate-700 rounded transition-opacity"
-                                                >
-                                                    <Trash2 className="w-3 h-3 text-slate-500" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                            <Trash2 className="w-3 h-3 text-slate-500" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -270,11 +214,36 @@ function ReportsContent() {
             {/* Right Content Area */}
             <main className="flex-1 bg-white overflow-y-auto">
                 {selectedGroup ? (
-                    <CombinedReportView
-                        algoReport={selectedGroup.algoReport}
-                        llmReport={selectedGroup.llmReport}
-                        companyReport={selectedGroup.companyReport}
-                    />
+                    <div className="max-w-4xl mx-auto p-8">
+                        {/* Header */}
+                        <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                {selectedGroup.hasAlgo && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">알고리즘</Badge>}
+                                {selectedGroup.hasLlm && <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">종합 분석</Badge>}
+                                {selectedGroup.hasCompany && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">기업 분석</Badge>}
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-900">
+                                {selectedGroup.symbolName} ({selectedGroup.symbol})
+                            </h1>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {format(new Date(selectedGroup.timestamp), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                            </p>
+                        </div>
+
+                        {/* Report Content */}
+                        {selectedGroup.algoReport && (
+                            <AlgoReportView analysis={selectedGroup.algoReport.analysis} />
+                        )}
+                        {selectedGroup.llmReport && (
+                            <LlmReportView analysis={selectedGroup.llmReport.analysis} />
+                        )}
+                        {selectedGroup.companyReport && (
+                            <LlmReportView
+                                analysis={selectedGroup.companyReport.analysis}
+                                mode="company"
+                            />
+                        )}
+                    </div>
                 ) : (
                     <div className="flex items-center justify-center h-full">
                         <div className="text-center">

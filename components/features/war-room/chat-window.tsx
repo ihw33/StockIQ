@@ -329,7 +329,7 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
                 profitRate: position.profitRate
             } : undefined;
 
-            // 백엔드에 백그라운드 심층분석 요청 (즉시 응답, 서버에서 비동기 실행)
+            // 백엔드에 백그라운드 종합분석 요청 (즉시 응답, 서버에서 비동기 실행)
             const res = await fetch('/api/ai/deep-analysis-start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -342,7 +342,7 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
             const startMsg: ChatMessage = {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: `🧠 **${currentName || currentSymbol}** 심층분석이 백그라운드에서 진행 중입니다.\n\n다른 페이지로 이동해도 분석은 계속됩니다. 완료되면 **보고서 탭**에 알림이 표시됩니다.`,
+                content: `🧠 **${currentName || currentSymbol}** 종합분석이 백그라운드에서 진행 중입니다.\n\n다른 페이지로 이동해도 분석은 계속됩니다. 완료되면 **보고서 탭**에 알림이 표시됩니다.`,
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, startMsg]);
@@ -352,7 +352,7 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: '심층분석 시작에 실패했습니다. AI 엔진 연결을 확인하세요.',
+                content: '종합분석 시작에 실패했습니다. AI 엔진 연결을 확인하세요.',
                 timestamp: new Date()
             }]);
         } finally {
@@ -445,7 +445,7 @@ export function ChatWindow({ onCommand, isOpen = true, currentSymbol, currentNam
                             className="bg-purple-900/20 border-purple-800 text-purple-400 hover:bg-purple-900/40 hover:text-purple-300 transition-all font-mono text-xs"
                         >
                             <Brain className="w-4 h-4 mr-2" />
-                            심층 분석
+                            종합 분석
                         </Button>
 
                         {/* Input Field */}

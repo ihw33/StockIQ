@@ -53,7 +53,7 @@ export function AnalysisReportModal({
                             </div>
                             <div>
                                 <DialogTitle className="text-xl font-bold text-white">
-                                    {mode === 'llm' ? 'AI 심층 분석 보고서' : '기술적 분석 보고서'}
+                                    {mode === 'llm' ? 'AI 종합 분석 보고서' : '기술적 분석 보고서'}
                                 </DialogTitle>
                                 <p className="text-sm text-slate-400 mt-1">
                                     {symbolName || symbol} ({symbol})

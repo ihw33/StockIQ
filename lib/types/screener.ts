@@ -1,0 +1,48 @@
+/**
+ * 스크리너 타입 정의
+ */
+
+export interface ScreenerResult {
+    symbol: string;
+    name: string;
+    market: string;
+    sector: string;
+    industry: string;
+    market_cap: number;
+    per?: number;
+    pbr?: number;
+    roe?: number;
+    eps?: number;
+    bps?: number;
+    // 재무제표 (DART)
+    revenue?: number;               // 매출액 (원)
+    operating_profit?: number;      // 영업이익 (원)
+    operating_profit_growth?: number;  // 영업이익증가율 (%)
+    fiscal_period?: string;         // 회계기간 (예: "2025 Q3")
+    // 거래 정보
+    cur_price?: number;
+    change?: number;        // 전일대비
+    change_pct?: number;    // 등락률
+    volume?: number;
+    trade_amount?: number;
+}
+
+export interface ScreenerRequest {
+    profile: 'semiconductor_equipment' | 'all_kospi' | 'all_kosdaq';
+    filters?: FilterConfig;
+}
+
+export interface FilterConfig {
+    per_min?: number;
+    per_max?: number;
+    roe_min?: number;
+    eps_min?: number;
+    market_cap_min?: number;
+    sector?: string[];
+}
+
+export interface ScreenerResponse {
+    total: number;
+    results: ScreenerResult[];
+    updated_at?: string;
+}

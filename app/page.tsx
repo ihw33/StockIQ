@@ -1,241 +1,232 @@
-"use client";
-import { useState, useEffect, useRef } from "react";
+'use client'
 
-import { DetailedStockCard } from "@/components/features/stock/detailed-stock-card";
-import { MacroSummaryBar } from "@/components/features/macro/macro-summary-bar";
-import { UnifiedSidebar } from "@/components/features/sidebar/unified-sidebar";
-import { RightPanel, RightPanelHandle } from "@/components/features/war-room/right-panel";
-import { AccountStatus } from "@/components/features/stock/account-status";
-import { StockSearchModal } from "@/components/features/stock/stock-search-modal";
-import { ScreenerModal } from "@/components/features/stock/screener-modal";
-import { useWatchlist } from "@/lib/hooks/use-watchlist";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Wallet, MessageCircle, Power, Search, Filter } from "lucide-react";
-import { usePortfolioStore } from "@/lib/stores/portfolio-store";
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import {
+  TrendingUp, TrendingDown, Minus,
+  Monitor, Filter, BarChart3, Activity,
+  Globe, FileText, Zap, BookOpen,
+  ArrowUpRight, ArrowDownRight,
+  RefreshCw
+} from 'lucide-react'
 
-export default function Home() {
-    const [activeSymbol, setActiveSymbol] = useState<string>("005930");
-    const [activeName, setActiveName] = useState<string>("삼성전자");
-    const [botRunning, setBotRunning] = useState(false);
-    const [botLoading, setBotLoading] = useState(false);
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isScreenerOpen, setIsScreenerOpen] = useState(false);
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001'
 
-    const rightPanelRef = useRef<RightPanelHandle>(null);
-    const updateCurrentPrice = usePortfolioStore((state) => state.updateCurrentPrice);
+interface MarketIndex {
+  close: number
+  change: number
+  change_pct: number
+  date: string
+}
 
-    const {
-        watchlist,
-        activeGroup,
-        setActiveGroup,
-        isLoaded,
-        addToWatchlist,
-        removeFromWatchlist,
-        isInWatchlist,
-        getItemGroup,
-        changeGroup,
-    } = useWatchlist();
+interface SectorItem {
+  name: string
+  change_pct: number
+}
 
-    // Cmd+K for search
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                setIsSearchOpen(prev => !prev);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+interface RecentNote {
+  id: number
+  stock_name: string
+  symbol: string
+  trade_type: string
+  trade_date: string
+  status: string
+  profit_pct: number | null
+  buy_reason: string
+}
 
-    // Bot status check
-    useEffect(() => {
-        const checkBotStatus = async () => {
-            try {
-                const res = await fetch('/api/bot');
-                const data = await res.json();
-                setBotRunning(data.running);
-            } catch {
-                setBotRunning(false);
-            }
-        };
-        checkBotStatus();
-        const interval = setInterval(checkBotStatus, 5000);
-        return () => clearInterval(interval);
-    }, []);
+const SERVICES = [
+  { href: '/terminal', icon: Monitor, label: '종목 분석', desc: 'Kiwoom Pro 터미널', color: 'from-blue-500/10 to-blue-600/5 border-blue-500/20 hover:border-blue-400/40' },
+  { href: '/screener', icon: Filter, label: '스크리너', desc: '종목 필터링', color: 'from-indigo-500/10 to-indigo-600/5 border-indigo-500/20 hover:border-indigo-400/40' },
+  { href: '/sectors/trends', icon: BarChart3, label: '섹터 동향', desc: '업종/테마 로테이션', color: 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20 hover:border-emerald-400/40' },
+  { href: '/stocks/movers', icon: Activity, label: '종목 동향', desc: '상승/하락 종목', color: 'from-rose-500/10 to-rose-600/5 border-rose-500/20 hover:border-rose-400/40' },
+  { href: '/macro', icon: Globe, label: '매크로', desc: '거시 경제 지표', color: 'from-amber-500/10 to-amber-600/5 border-amber-500/20 hover:border-amber-400/40' },
+  { href: '/reports', icon: FileText, label: '보고서', desc: 'AI 분석 보고서', color: 'from-purple-500/10 to-purple-600/5 border-purple-500/20 hover:border-purple-400/40' },
+  { href: '/alpha-hr', icon: Zap, label: 'Alpha-HR', desc: '기업 투자 분석', color: 'from-cyan-500/10 to-cyan-600/5 border-cyan-500/20 hover:border-cyan-400/40' },
+  { href: '/notes', icon: BookOpen, label: '매매 노트', desc: '거래 기록 관리', color: 'from-orange-500/10 to-orange-600/5 border-orange-500/20 hover:border-orange-400/40' },
+]
 
-    const toggleBot = async () => {
-        setBotLoading(true);
-        try {
-            const res = await fetch('/api/bot', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: botRunning ? 'stop' : 'start' }),
-            });
-            const data = await res.json();
-            if (data.success) setBotRunning(!botRunning);
-        } catch (error) {
-            console.error('Bot toggle failed:', error);
-        } finally {
-            setBotLoading(false);
-        }
-    };
+const TYPE_LABELS: Record<string, string> = { buy: '매수', sell: '매도', watch: '관심' }
+const STATUS_LABELS: Record<string, string> = { hold: '보유중', closed: '완료', watch: '관심' }
 
-    const handleSelectStock = (symbol: string, name: string) => {
-        setActiveSymbol(symbol);
-        setActiveName(name);
-    };
+export default function HomePage() {
+  const [market, setMarket] = useState<Record<string, MarketIndex | { status: string }>>({})
+  const [sectors, setSectors] = useState<{ up: SectorItem[]; down: SectorItem[] }>({ up: [], down: [] })
+  const [recentNotes, setRecentNotes] = useState<RecentNote[]>([])
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true)
+      await Promise.allSettled([
+        loadMarket(),
+        loadSectors(),
+        loadNotes(),
+      ])
+      setLoading(false)
+    }
+    loadAll()
+  }, [])
+
+  const loadMarket = async () => {
+    try {
+      const res = await fetch(`${API}/api/market/summary`)
+      const data = await res.json()
+      setMarket(data)
+    } catch { /* silent */ }
+  }
+
+  const loadSectors = async () => {
+    try {
+      const res = await fetch(`${API}/api/sectors/history?days=1`)
+      const data = await res.json()
+      // 업종 상위 3 / 하위 3
+      const dates = Object.keys(data?.data || {})
+      const latest = dates.length > 0 ? data.data[dates[0]] : null
+      const industries = latest?.industries || {}
+      const up = (industries.up || []).slice(0, 3)
+      const down = (industries.down || []).slice(0, 3)
+      setSectors({ up, down })
+    } catch { /* silent */ }
+  }
+
+  const loadNotes = async () => {
+    try {
+      const res = await fetch(`${API}/api/notes?limit=3`)
+      const data = await res.json()
+      setRecentNotes(data)
+    } catch { /* silent */ }
+  }
+
+  const renderIndex = (name: string, label: string) => {
+    const d = market[name]
+    if (!d || 'status' in d) return (
+      <div className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-4 py-3">
+        <p className="text-xs text-slate-500 mb-1">{label}</p>
+        <p className="text-slate-600 text-sm">-</p>
+      </div>
+    )
+    const m = d as MarketIndex
+    const pos = m.change_pct > 0
+    const neg = m.change_pct < 0
     return (
-        <main className="min-h-screen bg-slate-950 text-slate-100">
-            <div className="h-screen flex flex-col">
-                {/* Header */}
-                <header className="shrink-0 flex justify-between items-center px-4 py-2 bg-slate-900/50 border-b border-slate-800">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-                            StockIQ
-                        </h1>
-                        <span className="text-slate-500 font-light text-xs border-l border-slate-700 pl-3">Kiwoom Pro Terminal</span>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setIsSearchOpen(true)}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded transition-colors border border-slate-700"
-                        >
-                            <Search size={12} className="text-blue-400" />
-                            종목 검색
-                            <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-slate-700 rounded">⌘K</kbd>
-                        </button>
+      <div className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-4 py-3">
+        <p className="text-xs text-slate-500 mb-1">{label}</p>
+        <p className="text-base font-bold text-slate-100">{m.close.toLocaleString()}</p>
+        <p className={`text-xs flex items-center gap-0.5 mt-0.5 ${pos ? 'text-red-400' : neg ? 'text-blue-400' : 'text-slate-400'}`}>
+          {pos ? <ArrowUpRight size={12} /> : neg ? <ArrowDownRight size={12} /> : <Minus size={12} />}
+          {m.change_pct > 0 ? '+' : ''}{m.change_pct.toFixed(2)}%
+        </p>
+      </div>
+    )
+  }
 
-                        <button
-                            onClick={() => window.location.href = '/reports'}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded transition-colors border border-slate-700"
-                        >
-                            보고서
-                        </button>
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* 시장 현황 */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">시장 현황</h2>
+            <button
+              onClick={() => { loadMarket(); loadSectors(); loadNotes() }}
+              className="p-1 text-slate-600 hover:text-slate-400 transition-colors"
+              title="새로고침"
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+          <div className="flex gap-3">
+            {renderIndex('KOSPI', '코스피')}
+            {renderIndex('KOSDAQ', '코스닥')}
+            {renderIndex('NASDAQ', '나스닥')}
+          </div>
+        </section>
 
-                        <button
-                            onClick={() => window.location.href = '/macro'}
-                            className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded transition-colors border border-slate-700"
-                        >
-                            매크로
-                        </button>
-
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <button className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded transition-colors border border-slate-700">
-                                    <Wallet size={12} className="text-emerald-400" />
-                                    0198 계좌
-                                </button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[700px] bg-slate-950 border-slate-800 text-slate-100">
-                                <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2">
-                                        <Wallet size={16} className="text-emerald-500" />
-                                        계좌현황 (0198)
-                                    </DialogTitle>
-                                </DialogHeader>
-                                <div className="h-[400px]">
-                                    <AccountStatus />
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-
-                        <button
-                            onClick={toggleBot}
-                            disabled={botLoading}
-                            className={`flex items-center gap-1.5 px-3 py-1 text-white text-xs font-bold rounded transition-colors ${botRunning
-                                ? 'bg-red-600 hover:bg-red-700'
-                                : 'bg-green-600 hover:bg-green-700'
-                                } ${botLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <Power size={12} className={botLoading ? 'animate-pulse' : ''} />
-                            {botLoading ? '...' : botRunning ? '봇 종료' : '봇 시작'}
-                        </button>
-
-                        <span className={`px-1.5 py-0.5 text-[10px] rounded border flex items-center ${botRunning
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : 'bg-red-500/10 text-red-400 border-red-500/20'
-                            }`}>
-                            {botRunning ? 'Bot ON' : 'Bot OFF'}
-                        </span>
-
-                        <button
-                            onClick={() => setIsScreenerOpen(true)}
-                            className="ml-2 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1.5"
-                        >
-                            <Filter size={12} />
-                            스크리너
-                        </button>
-
-                        <button
-                            onClick={() => window.open('https://t.me/stocktome_bot', '_blank')}
-                            className="ml-2 px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded transition-colors flex items-center gap-1.5"
-                        >
-                            <MessageCircle size={12} />
-                            자동매매 설정
-                        </button>
-                        <button
-                            onClick={() => window.location.href = '/alpha-hr'}
-                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition-colors"
-                        >
-                            Alpha-HR
-                        </button>
-                    </div>
-                </header>
-
-                {/* 3-Column Layout */}
-                <div className="flex flex-1 min-h-0">
-                    {/* Left: Unified Sidebar */}
-                    {isLoaded && (
-                        <UnifiedSidebar
-                            currentSymbol={activeSymbol}
-                            onSelectSymbol={handleSelectStock}
-                            watchlist={watchlist}
-                            activeGroup={activeGroup}
-                            onChangeGroup={setActiveGroup}
-                            onRemoveFromWatchlist={removeFromWatchlist}
-                            onOpenSearch={() => setIsSearchOpen(true)}
-                            onMoveToGroup={changeGroup}
-                        />
-                    )}
-
-                    {/* Center: Macro + Chart */}
-                    <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                        <MacroSummaryBar />
-                        <div className="flex-1 min-h-0">
-                            <DetailedStockCard
-                                symbol={activeSymbol}
-                                name={activeName}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Right: AI Analysis + Reports */}
-                    <RightPanel
-                        ref={rightPanelRef}
-                        currentSymbol={activeSymbol}
-                        currentName={activeName}
-                    />
-                </div>
+        {/* 포트폴리오 + 섹터 */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* 섹터 동향 */}
+          <section className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">오늘의 섹터</h2>
+              <Link href="/sectors/trends" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">전체 →</Link>
             </div>
+            {sectors.up.length === 0 && sectors.down.length === 0 ? (
+              <p className="text-slate-600 text-sm">데이터 없음 (장 마감 후 또는 휴장일)</p>
+            ) : (
+              <div className="space-y-1.5">
+                {sectors.up.map(s => (
+                  <div key={s.name} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-300 truncate">{s.name}</span>
+                    <span className="text-xs text-red-400 font-medium shrink-0 ml-2">▲ +{s.change_pct.toFixed(1)}%</span>
+                  </div>
+                ))}
+                {sectors.down.map(s => (
+                  <div key={s.name} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-300 truncate">{s.name}</span>
+                    <span className="text-xs text-blue-400 font-medium shrink-0 ml-2">▼ {s.change_pct.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
-            {/* Modals */}
-            <StockSearchModal
-                isOpen={isSearchOpen}
-                onClose={() => setIsSearchOpen(false)}
-                onSelectStock={handleSelectStock}
-                onAddToWatchlist={addToWatchlist}
-                isInWatchlist={isInWatchlist}
-            />
-            <ScreenerModal
-                isOpen={isScreenerOpen}
-                onClose={() => setIsScreenerOpen(false)}
-                onSelectStock={handleSelectStock}
-                onAddToWatchlist={addToWatchlist}
-                isInWatchlist={isInWatchlist}
-                getItemGroup={getItemGroup}
-            />
-        </main>
-    );
+          {/* 매매 노트 최근 */}
+          <section className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">최근 매매 노트</h2>
+              <Link href="/notes" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">전체 →</Link>
+            </div>
+            {recentNotes.length === 0 ? (
+              <div>
+                <p className="text-slate-600 text-sm mb-2">기록 없음</p>
+                <Link href="/notes/new" className="text-xs text-amber-400 hover:text-amber-300">+ 첫 노트 작성</Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {recentNotes.map(n => (
+                  <Link key={n.id} href={`/notes/${n.id}`} className="block group">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium text-slate-200 group-hover:text-amber-400 transition-colors truncate block">
+                          {n.stock_name || n.symbol}
+                        </span>
+                        <span className="text-[10px] text-slate-600">
+                          {TYPE_LABELS[n.trade_type] || n.trade_type} · {STATUS_LABELS[n.status] || n.status}
+                          {n.trade_date ? ` · ${n.trade_date}` : ''}
+                        </span>
+                      </div>
+                      {n.profit_pct !== null && n.profit_pct !== undefined ? (
+                        <span className={`text-xs font-bold shrink-0 ml-2 ${n.profit_pct > 0 ? 'text-red-400' : n.profit_pct < 0 ? 'text-blue-400' : 'text-slate-400'}`}>
+                          {n.profit_pct > 0 ? '+' : ''}{n.profit_pct.toFixed(1)}%
+                        </span>
+                      ) : null}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* 서비스 바로가기 */}
+        <section>
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">서비스</h2>
+          <div className="grid grid-cols-4 gap-3">
+            {SERVICES.map(s => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className={`bg-gradient-to-br ${s.color} border rounded-lg p-4 transition-all hover:scale-[1.02] group`}
+              >
+                <s.icon size={20} className="text-slate-400 group-hover:text-slate-200 transition-colors mb-2" />
+                <p className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">{s.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{s.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  )
 }

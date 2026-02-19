@@ -1,0 +1,71 @@
+services:
+  stockiq-db:
+    image: postgres:15-alpine
+    container_name: stockiq-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stockiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockiq_secure_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-stockiq}
+    volumes:
+      - stockiq-pgdata:/var/lib/postgresql/data
+      - ./deploy/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stockiq}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  stockiq-api:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    container_name: stockiq-api
+    restart: unless-stopped
+    depends_on:
+      stockiq-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://stockiq:stockiq_secure_pw@stockiq-db:5432/stockiq}
+      DB_HOST: stockiq-db
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-stockiq}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-stockiq_secure_pw}
+      DB_NAME: ${POSTGRES_DB:-stockiq}
+      KIWOOM_APP_KEY: ${KIWOOM_APP_KEY}
+      KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY}
+      KIWOOM_BASE_URL: ${KIWOOM_BASE_URL:-https://openapi.koreainvestment.com:9443}
+      KIWOOM_ACCOUNT: ${KIWOOM_ACCOUNT}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      DART_API_KEY: ${DART_API_KEY}
+      FRED_API_KEY: ${FRED_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    ports:
+      - "8100:8001"
+
+  stockiq-web:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ""
+        BACKEND_URL: http://stockiq-api:8001
+    container_name: stockiq-web
+    restart: unless-stopped
+    depends_on:
+      - stockiq-api
+    environment:
+      BACKEND_URL: http://stockiq-api:8001
+      AI_ENGINE_URL: http://stockiq-api:8001
+      KIWOOM_APP_KEY: ${KIWOOM_APP_KEY}
+      KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY}
+      KIWOOM_BASE_URL: ${KIWOOM_BASE_URL:-https://openapi.koreainvestment.com:9443}
+      KIWOOM_ACCOUNT: ${KIWOOM_ACCOUNT}
+    ports:
+      - "3100:3000"
+
+volumes:
+  stockiq-pgdata:

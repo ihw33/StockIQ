@@ -23,6 +23,8 @@ interface CompanyData {
     foreign_ratio: number | null;
     sales: number | null;
     operating_profit: number | null;
+    operating_profit_growth: number | null;
+    fiscal_period: string | null;
     net_income: number | null;
     dividend_rate: number | null;
 }
@@ -307,6 +309,20 @@ export function CompanyInfoCard({ symbol, name, onRequestAIAnalysis }: CompanyIn
                         <div className="flex items-center justify-between text-xs py-0.5">
                             <span className="text-gray-500 cursor-help" title={METRIC_TOOLTIPS['영업이익률']}>영업이익률</span>
                             <span className="font-medium text-gray-700">{((data.operating_profit / data.sales) * 100).toFixed(1)}%</span>
+                        </div>
+                    )}
+                    {data.operating_profit_growth != null && (
+                        <div className="flex items-center justify-between text-xs py-0.5">
+                            <span className="text-gray-500">영업이익증가율</span>
+                            <span className={`font-medium ${data.operating_profit_growth > 0 ? 'text-green-600' : data.operating_profit_growth < 0 ? 'text-red-600' : 'text-gray-700'}`}>
+                                {data.operating_profit_growth > 0 ? '+' : ''}{data.operating_profit_growth.toFixed(1)}%
+                            </span>
+                        </div>
+                    )}
+                    {data.fiscal_period && (
+                        <div className="flex items-center justify-between text-xs py-0.5">
+                            <span className="text-gray-500">재무기간</span>
+                            <span className="font-medium text-gray-700">{data.fiscal_period}</span>
                         </div>
                     )}
                 </div>

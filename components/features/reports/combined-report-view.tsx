@@ -25,7 +25,7 @@ export function CombinedReportView({ algoReport, llmReport, companyReport }: Com
     const handleDownload = () => {
         const parts: string[] = [];
         if (algoReport) parts.push('# 기술적 분석\n\n' + algoReport.analysis);
-        if (llmReport) parts.push('# AI 심층 분석\n\n' + llmReport.analysis);
+        if (llmReport) parts.push('# AI 종합 분석\n\n' + llmReport.analysis);
         if (companyReport) parts.push('# 기업 분석\n\n' + companyReport.analysis);
         const content = parts.join('\n\n---\n\n');
 
@@ -99,7 +99,7 @@ export function CombinedReportView({ algoReport, llmReport, companyReport }: Com
                         </div>
                         <div className="relative flex justify-center">
                             <span className="px-4 bg-white text-sm text-gray-500 font-medium">
-                                AI 심층 분석
+                                AI 종합 분석
                             </span>
                         </div>
                     </div>

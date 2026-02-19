@@ -34,11 +34,19 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
     try {
+        let body = '{}';
+        try {
+            body = JSON.stringify(await request.json());
+        } catch {
+            // empty body is ok
+        }
+
         const response = await fetch(`${AI_ENGINE_URL}/api/macro/collect`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            body,
         });
 
         if (!response.ok) {
